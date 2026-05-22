@@ -1,0 +1,9 @@
+streamlit>=1.30.0
+yfinance>=0.2.38
+finance-datareader>=0.9.84
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.18.0
+google-generativeai>=0.4.0
+python-dotenv>=1.0.1
+urllib3>=1.26.18,<2.0.0
