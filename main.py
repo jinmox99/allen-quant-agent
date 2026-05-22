@@ -23,7 +23,7 @@ st.set_page_config(
     page_title="Allen Quant Agent",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ----------------- PREMIUM DARK STYLING -----------------
@@ -40,12 +40,6 @@ st.markdown("""
     .stApp {
         background-color: #0d0f14;
         color: #e2e8f0;
-    }
-    
-    /* Sidebar styling */
-    [data-testid="stSidebar"] {
-        background-color: #121620 !important;
-        border-right: 1px solid #1f293d;
     }
     
     /* Tabs custom styling */
@@ -143,13 +137,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# ----------------- SIDEBAR CONFIG -----------------
-st.sidebar.markdown("<h2 style='text-align: center; color: #38bdf8;'>⚙️ Quant Agent Settings</h2>", unsafe_allow_html=True)
-
-# Footer credits
-st.sidebar.markdown("---")
-st.sidebar.markdown("<div style='text-align: center; color: #64748b; font-size: 12px;'>Allen Quant Agent v1.0<br>© 2026 Pair Programming Pro</div>", unsafe_allow_html=True)
 
 # ----------------- APP HEADER -----------------
 st.markdown("<h1 class='agent-title'>⚡ Allen Quant Agent</h1>", unsafe_allow_html=True)
@@ -714,3 +701,7 @@ with tab3:
                                 """, unsafe_allow_html=True)
         else:
             st.info("왼쪽 패널에서 종목을 선택한 후 'AI 에이전트 보고서 발행' 버튼을 클릭하시면 에이전트의 브리핑 보고서가 여기에 렌더링됩니다.")
+
+# ----------------- FOOTER -----------------
+st.markdown("---")
+st.markdown("<div style='text-align: center; color: #64748b; font-size: 12px; padding: 20px 0;'>Allen Quant Agent v1.0 | © 2026 Pair Programming Pro</div>", unsafe_allow_html=True)
