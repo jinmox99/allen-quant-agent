@@ -74,18 +74,10 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
     macd_sig[df['MACD'] > df['MACD_Signal']] = 1
     macd_sig[df['MACD'] < df['MACD_Signal']] = -1
     
-    # 3. RSI Signals
-    rsi_sig = pd.Series(0, index=df.index)
-    rsi_sig[df['RSI'] <= 30] = 1
-    rsi_sig[df['RSI'] >= 70] = -1
-    
-    # 4. BB Signals
-    bb_sig = pd.Series(0, index=df.index)
-    bb_sig[(df['Low'] <= df['BB_Lower']) | (df['Close'] <= df['BB_Lower']*1.01)] = 1
-    bb_sig[(df['High'] >= df['BB_Upper']) | (df['Close'] >= df['BB_Upper']*0.99)] = -1
+    # 3. (RSI/BB removed)
 
     # ==========================================
-    # Smart Strategies: 퀀트 모멘텀, 터틀 트레이딩, 골든크로스
+    # Smart Strategies
     # ==========================================
     
     def simulate_quant_momentum():
@@ -118,201 +110,154 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
-    def simulate_turtle_trading():
-        desc = "리처드 데니스의 전설적인 '터틀 트레이딩' 추세 추종 전략입니다. 주가가 최근 20일간의 최고점(신고가)을 돌파하면 대세 상승의 시작으로 보고 전액 매수합니다. 반대로 주가가 최근 10일간의 최저점(신저가) 밑으로 깨지면 미련 없이 전액 매도(손절/익절)하여 빠져나옵니다."
+    def simulate_adx_trend():
+        desc = "ADX(평균방향지수)로 추세의 '강도'를 측정합니다. ADX가 25를 넘고 +DI가 -DI 위에 있으면 강한 상승 추세로 판단하여 매수하고, ADX가 20 아래로 떨어지거나 -DI가 +DI를 상회하면 추세 소멸로 매도합니다."
         cash = initial_capital
         shares = 0.0
         trades = []
         history = [initial_capital]
-        
         for i in range(1, len(df)):
             close_p = float(df['Close'].iloc[i])
-            donchian_high = float(df['Donchian_High_20'].iloc[i]) if 'Donchian_High_20' in df.columns and not np.isnan(df['Donchian_High_20'].iloc[i]) else float('inf')
-            donchian_low = float(df['Donchian_Low_10'].iloc[i]) if 'Donchian_Low_10' in df.columns and not np.isnan(df['Donchian_Low_10'].iloc[i]) else 0
+            adx = float(df['ADX'].iloc[i]) if 'ADX' in df.columns and not np.isnan(df['ADX'].iloc[i]) else 0
+            plus_di = float(df['Plus_DI'].iloc[i]) if 'Plus_DI' in df.columns and not np.isnan(df['Plus_DI'].iloc[i]) else 0
+            minus_di = float(df['Minus_DI'].iloc[i]) if 'Minus_DI' in df.columns and not np.isnan(df['Minus_DI'].iloc[i]) else 0
             date_str = dates.iloc[i]
-            
-            # 매수 (20일 신고가 돌파)
-            if close_p > donchian_high and cash > 0:
+            if adx > 25 and plus_di > minus_di and cash > 0:
                 shares = cash / close_p
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "20일 신고가 돌파 (대세 상승)"})
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": f"ADX {adx:.0f} 강한 상승 추세 (+DI > -DI)"})
                 cash = 0.0
-                
-            # 매도 (10일 신저가 이탈)
-            elif close_p < donchian_low and shares > 0:
+            elif (adx < 20 or minus_di > plus_di) and shares > 0:
                 cash = shares * close_p
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "10일 신저가 이탈 (추세 이탈)"})
-                shares = 0.0
-                
-        final_value = cash + (shares * end_price)
-        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
-
-    def simulate_ema_cross():
-        desc = "반응이 느린 단순이동평균(SMA) 대신, 최근 가격에 가중치를 두어 반응을 극한으로 끌어올린 지수이동평균(EMA) 5일선과 20일선의 교차 전략입니다. 단기 5일선이 장기 20일선을 위로 뚫으면(골든크로스) 매수하고, 아래로 뚫으면(데드크로스) 칼같이 매도하여 하락장을 빠르게 피합니다."
-        cash = initial_capital
-        shares = 0.0
-        trades = []
-        history = [initial_capital]
-        
-        for i in range(1, len(df)):
-            close_p = float(df['Close'].iloc[i])
-            ema5_prev = float(df['EMA_5'].iloc[i-1]) if 'EMA_5' in df.columns and not np.isnan(df['EMA_5'].iloc[i-1]) else 0
-            ema20_prev = float(df['EMA_20'].iloc[i-1]) if 'EMA_20' in df.columns and not np.isnan(df['EMA_20'].iloc[i-1]) else 0
-            ema5 = float(df['EMA_5'].iloc[i]) if 'EMA_5' in df.columns and not np.isnan(df['EMA_5'].iloc[i]) else 0
-            ema20 = float(df['EMA_20'].iloc[i]) if 'EMA_20' in df.columns and not np.isnan(df['EMA_20'].iloc[i]) else 0
-            date_str = dates.iloc[i]
-            
-            # 골든크로스 매수
-            if (ema5_prev <= ema20_prev and ema5 > ema20) and cash > 0:
-                shares = cash / close_p
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "EMA 5/20 골든크로스 (단기 상승)"})
-                cash = 0.0
-                
-            # 데드크로스 매도
-            elif (ema5_prev >= ema20_prev and ema5 < ema20) and shares > 0:
-                cash = shares * close_p
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "EMA 5/20 데드크로스 (단기 하락)"})
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": f"ADX {adx:.0f} 추세 소멸 또는 하락 전환"})
                 shares = 0.0
             history.append(cash + shares * close_p)
-                
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
-    def simulate_hybrid_momentum():
-        desc = "애플과 하이닉스 같은 대형 우량주에 최적화된 복합 모멘텀(HYBRID) 전략입니다. 20일선 상향 돌파 시 보유 현금의 50%를 추세 매수하고, RSI 30 이하 폭락 시 남은 현금의 50%를 투매 줍기로 매수합니다. 매도는 RSI 70 이상 과열 시 절반(50%)만 익절하고, MACD 데드크로스 발생 시 상승 에너지가 끝났다고 보아 전량(100%) 매도(손절/익절)하여 도망칩니다."
+    def simulate_stochastic():
+        desc = "스토캐스틱 오실레이터로 과매수/과매도를 탐지합니다. %K가 %D를 상향 돌파하며 20 이하(과매도)에서 올라오면 매수, %K가 %D를 하향 돌파하며 80 이상(과매수)에서 내려오면 매도합니다."
         cash = initial_capital
         shares = 0.0
         trades = []
         history = [initial_capital]
-        
         for i in range(1, len(df)):
             close_p = float(df['Close'].iloc[i])
-            close_p_prev = float(df['Close'].iloc[i-1])
-            sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
-            sma20_prev = float(df['SMA_20'].iloc[i-1]) if not np.isnan(df['SMA_20'].iloc[i-1]) else 0
-            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
-            macd = float(df['MACD'].iloc[i]) if not np.isnan(df['MACD'].iloc[i]) else 0
-            macd_signal = float(df['MACD_Signal'].iloc[i]) if not np.isnan(df['MACD_Signal'].iloc[i]) else 0
-            macd_prev = float(df['MACD'].iloc[i-1]) if not np.isnan(df['MACD'].iloc[i-1]) else 0
-            macd_signal_prev = float(df['MACD_Signal'].iloc[i-1]) if not np.isnan(df['MACD_Signal'].iloc[i-1]) else 0
+            k = float(df['Stoch_K'].iloc[i]) if 'Stoch_K' in df.columns and not np.isnan(df['Stoch_K'].iloc[i]) else 50
+            d = float(df['Stoch_D'].iloc[i]) if 'Stoch_D' in df.columns and not np.isnan(df['Stoch_D'].iloc[i]) else 50
+            k_prev = float(df['Stoch_K'].iloc[i-1]) if 'Stoch_K' in df.columns and not np.isnan(df['Stoch_K'].iloc[i-1]) else 50
+            d_prev = float(df['Stoch_D'].iloc[i-1]) if 'Stoch_D' in df.columns and not np.isnan(df['Stoch_D'].iloc[i-1]) else 50
             date_str = dates.iloc[i]
-            
-            # 매수 1 (추세 돌파: 20일선 상향 돌파)
-            if close_p_prev <= sma20_prev and close_p > sma20 and cash > 10:
-                buy_cash = cash * 0.5
-                buy_shares = buy_cash / close_p
-                shares += buy_shares
-                cash -= buy_cash
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "추세 돌파 (20일선 돌파, 50% 매수)"})
-                
-            # 매수 2 (투매 줍기: RSI <= 30)
-            elif rsi <= 30 and cash > 10:
-                buy_cash = cash * 0.5
-                buy_shares = buy_cash / close_p
-                shares += buy_shares
-                cash -= buy_cash
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "투매 포착 (RSI 30 이하, 50% 매수)"})
-                
-            # 매도 1 (과열 익절: RSI >= 70)
-            elif rsi >= 70 and shares > 0:
-                sell_shares = shares * 0.5
-                cash += sell_shares * close_p
-                shares -= sell_shares
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "과열 징후 (RSI 70 이상, 50% 익절)"})
-                
-            # 매도 2 (추세 붕괴: MACD 데드크로스)
-            elif macd_prev >= macd_signal_prev and macd < macd_signal and shares > 0:
-                sell_shares = shares
-                cash += sell_shares * close_p
-                shares -= sell_shares
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "추세 붕괴 (MACD 데드크로스, 전량 매도)"})
-                
+            if k_prev <= d_prev and k > d and k < 30 and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": f"스토캐스틱 골든크로스 (%K={k:.0f}, 과매도 탈출)"})
+                cash = 0.0
+            elif k_prev >= d_prev and k < d and k > 70 and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": f"스토캐스틱 데드크로스 (%K={k:.0f}, 과매수 이탈)"})
+                shares = 0.0
+            history.append(cash + shares * close_p)
         final_value = cash + (shares * end_price)
-        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
-    def simulate_bb_squeeze():
-        desc = "변동성이 극도로 줄어든 스퀴즈(Squeeze) 구간에서 상단 밴드를 강하게 뚫을 때 추격 매수하고, 추세선(20일선)이 깨지면 매도하는 돌파 전략입니다."
+    def simulate_ichimoku():
+        desc = "일본 전통 기술분석 '일목균형표(이치모쿠 구름)' 전략입니다. 주가가 구름대(선행스팬A·B 사이) 위로 올라서면 상승장으로 매수, 구름대 아래로 떨어지면 하락장으로 매도합니다. 구름대가 두꺼울수록 지지/저항이 강합니다."
         cash = initial_capital
         shares = 0.0
         trades = []
+        history = [initial_capital]
         for i in range(1, len(df)):
-            close = float(df['Close'].iloc[i])
-            bb_upper = float(df['BB_Upper'].iloc[i])
-            bb_width_prev = float(df['BB_Width'].iloc[i-1]) if 'BB_Width' in df.columns else 100
-            sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
+            close_p = float(df['Close'].iloc[i])
+            span_a = float(df['Ichimoku_SpanA'].iloc[i]) if 'Ichimoku_SpanA' in df.columns and not np.isnan(df['Ichimoku_SpanA'].iloc[i]) else close_p
+            span_b = float(df['Ichimoku_SpanB'].iloc[i]) if 'Ichimoku_SpanB' in df.columns and not np.isnan(df['Ichimoku_SpanB'].iloc[i]) else close_p
+            cloud_top = max(span_a, span_b)
+            cloud_bottom = min(span_a, span_b)
             date_str = dates.iloc[i]
-            
-            # 매수: 밴드 폭이 10% 미만이었다가 뚫고 올라갈 때
-            if bb_width_prev < 10.0 and close > bb_upper and cash > 10:
-                buy_shares = cash / close
-                shares += buy_shares
+            if close_p > cloud_top and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "구름대 상단 돌파 (상승장 진입)"})
                 cash = 0.0
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "스퀴즈 돌파 (밴드 상단 돌파)"})
-            # 매도: 종가가 20일선 밑으로 깨질 때
-            elif close < sma20 and shares > 0:
-                sell_shares = shares
-                cash += shares * close
+            elif close_p < cloud_bottom and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "구름대 하단 이탈 (하락장 전환)"})
                 shares = 0.0
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "추세 이탈 (20일선 하향 돌파)"})
-                
-        val = cash + (shares * end_price)
-        return {"return": ((val - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+            history.append(cash + shares * close_p)
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
-    def simulate_rsi_div():
-        desc = "주가는 이전 최저점을 깼지만(신저가), 보조지표 RSI는 이전 최저점보다 높아지는 '다이버전스' 현상을 포착해 폭락장의 찐 바닥을 잡는 전략입니다."
+    def simulate_obv():
+        desc = "OBV(거래량균형지표)로 세력의 매집/분배를 감지합니다. OBV가 20일 이동평균 위로 올라서면 세력이 매집 중으로 판단하여 매수, 아래로 떨어지면 분배(매도 중)로 판단하여 매도합니다."
         cash = initial_capital
         shares = 0.0
         trades = []
+        history = [initial_capital]
         for i in range(1, len(df)):
-            close = float(df['Close'].iloc[i])
-            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
-            min_close_prev = float(df['Min_Close_20'].iloc[i-1]) if 'Min_Close_20' in df.columns and not np.isnan(df['Min_Close_20'].iloc[i-1]) else 0
-            min_rsi_prev = float(df['Min_RSI_20'].iloc[i-1]) if 'Min_RSI_20' in df.columns and not np.isnan(df['Min_RSI_20'].iloc[i-1]) else 0
+            close_p = float(df['Close'].iloc[i])
+            obv = float(df['OBV'].iloc[i]) if 'OBV' in df.columns and not np.isnan(df['OBV'].iloc[i]) else 0
+            obv_ma = float(df['OBV_MA'].iloc[i]) if 'OBV_MA' in df.columns and not np.isnan(df['OBV_MA'].iloc[i]) else 0
+            obv_prev = float(df['OBV'].iloc[i-1]) if 'OBV' in df.columns and not np.isnan(df['OBV'].iloc[i-1]) else 0
+            obv_ma_prev = float(df['OBV_MA'].iloc[i-1]) if 'OBV_MA' in df.columns and not np.isnan(df['OBV_MA'].iloc[i-1]) else 0
             date_str = dates.iloc[i]
-            
-            # 매수: 주가는 신저가(20일 최저점)를 깼는데 RSI는 20일 최저점보다 높을 때 (그리고 RSI < 40)
-            if close < min_close_prev and rsi > min_rsi_prev and rsi < 40 and cash > 10:
-                buy_shares = cash / close
-                shares += buy_shares
+            if obv_prev <= obv_ma_prev and obv > obv_ma and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "OBV 매집 신호 (OBV > 20일 평균)"})
                 cash = 0.0
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "RSI 다이버전스 (바닥 매수)"})
-            # 매도: RSI 과열
-            elif rsi > 70 and shares > 0:
-                sell_shares = shares
-                cash += shares * close
+            elif obv_prev >= obv_ma_prev and obv < obv_ma and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "OBV 분배 신호 (OBV < 20일 평균)"})
                 shares = 0.0
-    def simulate_dual_momentum():
-        desc = "1개월, 3개월, 6개월 전 주가와 비교하여 모든 기간에서 주가가 상승했을 때만 100% 주식을 보유하고, 단기 추세가 꺾이면 전량 현금화하는 극강의 방어형 전략입니다."
+            history.append(cash + shares * close_p)
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
+
+    def simulate_parabolic_sar():
+        desc = "파라볼릭 SAR(Stop And Reverse) 전략입니다. SAR 점이 주가 아래에 있으면 상승 추세로 매수, SAR 점이 주가 위로 올라오면 추세 반전으로 매도합니다. 후행 스톱로스 역할도 합니다."
         cash = initial_capital
         shares = 0.0
         trades = []
-        history = []
-        for i in range(len(df)):
-            close = float(df['Close'].iloc[i])
-            c1 = float(df['Close_1M_ago'].iloc[i]) if 'Close_1M_ago' in df.columns and not np.isnan(df['Close_1M_ago'].iloc[i]) else 0
-            c3 = float(df['Close_3M_ago'].iloc[i]) if 'Close_3M_ago' in df.columns and not np.isnan(df['Close_3M_ago'].iloc[i]) else 0
-            c6 = float(df['Close_6M_ago'].iloc[i]) if 'Close_6M_ago' in df.columns and not np.isnan(df['Close_6M_ago'].iloc[i]) else 0
+        history = [initial_capital]
+        for i in range(1, len(df)):
+            close_p = float(df['Close'].iloc[i])
+            sar = float(df['PSAR'].iloc[i]) if 'PSAR' in df.columns and not np.isnan(df['PSAR'].iloc[i]) else close_p
+            sar_prev = float(df['PSAR'].iloc[i-1]) if 'PSAR' in df.columns and not np.isnan(df['PSAR'].iloc[i-1]) else close_p
+            close_prev = float(df['Close'].iloc[i-1])
             date_str = dates.iloc[i]
-            
-            cond1 = (close > c1) if c1 > 0 else True
-            cond3 = (close > c3) if c3 > 0 else True
-            cond6 = (close > c6) if c6 > 0 else True
-            
-            # 매수: 1, 3, 6개월 전보다 현재 주가가 모두 높을 때
-            if cond1 and cond3 and cond6 and cash > 10:
-                buy_shares = cash / close
-                shares += buy_shares
+            # 매수: SAR이 가격 위에서 아래로 내려옴 (추세 상승 전환)
+            if sar_prev > close_prev and sar < close_p and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "SAR 상승 전환 (점이 가격 아래로)"})
                 cash = 0.0
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "듀얼 모멘텀 (모든 추세 상승)"})
-            # 매도: 1개월, 3개월 모멘텀이 모두 마이너스로 돌아서면
-            elif (not cond1) and (not cond3) and shares > 0:
-                sell_shares = shares
-                cash += shares * close
+            # 매도: SAR이 가격 아래에서 위로 올라옴 (추세 하락 전환)
+            elif sar_prev < close_prev and sar > close_p and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "SAR 하락 전환 (점이 가격 위로)"})
                 shares = 0.0
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "단기/중기 추세 꺾임 (현금화)"})
-            history.append(cash + shares * close)
-                
-        val = cash + (shares * end_price)
-        return {"return": ((val - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
+            history.append(cash + shares * close_p)
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
+
+    def simulate_vwap():
+        desc = "VWAP(거래량가중평균가) 전략입니다. 기관 투자자들이 가장 많이 참고하는 지표로, 주가가 VWAP 위에 있으면 매수 우위, 아래에 있으면 매도 우위로 판단합니다. VWAP 상향 돌파 시 매수, 하향 이탈 시 매도합니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        history = [initial_capital]
+        for i in range(1, len(df)):
+            close_p = float(df['Close'].iloc[i])
+            vwap = float(df['VWAP'].iloc[i]) if 'VWAP' in df.columns and not np.isnan(df['VWAP'].iloc[i]) else close_p
+            close_prev = float(df['Close'].iloc[i-1])
+            vwap_prev = float(df['VWAP'].iloc[i-1]) if 'VWAP' in df.columns and not np.isnan(df['VWAP'].iloc[i-1]) else close_prev
+            date_str = dates.iloc[i]
+            if close_prev <= vwap_prev and close_p > vwap and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "VWAP 상향 돌파 (기관 매수 구간)"})
+                cash = 0.0
+            elif close_prev >= vwap_prev and close_p < vwap and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "VWAP 하향 이탈 (기관 매도 구간)"})
+                shares = 0.0
+            history.append(cash + shares * close_p)
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
     return {
         "단순 보유 (Buy & Hold)": {"return": bh_return, "mdd": bh_mdd, "trades": bh_trades, "desc": "가장 기본이 되는 벤치마크. 첫날에 현금을 전액 주식에 몰빵한 뒤, 끝까지 가만히 들고 있었을 경우의 수익률입니다."},
@@ -320,5 +265,11 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         "MACD": simulate(macd_sig, "단기 추세선이 장기 추세선을 상향 돌파(골든크로스)하면 전액 매수, 하향 돌파(데드크로스)하면 전액 매도합니다."),
         "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum(),
         "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross(),
-        "💎 🛡️ 듀얼 모멘텀": simulate_dual_momentum()
+        "💎 🛡️ 듀얼 모멘텀": simulate_dual_momentum(),
+        "📊 ADX 추세 강도": simulate_adx_trend(),
+        "🔄 스토캐스틱": simulate_stochastic(),
+        "☁️ 이치모쿠 구름": simulate_ichimoku(),
+        "📦 OBV 거래량 균형": simulate_obv(),
+        "🔴 파라볼릭 SAR": simulate_parabolic_sar(),
+        "🏛️ VWAP 기관 추종": simulate_vwap()
     }

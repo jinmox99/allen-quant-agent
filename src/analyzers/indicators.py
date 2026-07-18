@@ -9,19 +9,7 @@ def calculate_ema(df: pd.DataFrame, period: int = 20, column: str = 'Close') -> 
     """Calculates Exponential Moving Average (EMA)."""
     return df[column].ewm(span=period, adjust=False).mean()
 
-def calculate_rsi(df: pd.DataFrame, period: int = 14, column: str = 'Close') -> pd.Series:
-    """Calculates Relative Strength Index (RSI)."""
-    delta = df[column].diff()
-    gain = (delta.where(delta > 0, 0)).copy()
-    loss = (-delta.where(delta < 0, 0)).copy()
-    
-    # Exponential moving average for gain and loss
-    avg_gain = gain.ewm(com=period - 1, adjust=False).mean()
-    avg_loss = loss.ewm(com=period - 1, adjust=False).mean()
-    
-    rs = avg_gain / avg_loss.replace(0, 0.00001) # Avoid division by zero
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+
 
 def calculate_macd(df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9, column: str = 'Close') -> pd.DataFrame:
     """Calculates Moving Average Convergence Divergence (MACD)."""
@@ -34,15 +22,7 @@ def calculate_macd(df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int
     macd_df['MACD_Hist'] = macd_df['MACD'] - macd_df['MACD_Signal']
     return macd_df
 
-def calculate_bollinger_bands(df: pd.DataFrame, period: int = 20, std_dev: int = 2, column: str = 'Close') -> pd.DataFrame:
-    """Calculates Bollinger Bands (Middle, Upper, Lower)."""
-    bb_df = pd.DataFrame(index=df.index)
-    bb_df['BB_Mid'] = calculate_sma(df, period, column)
-    rolling_std = df[column].rolling(window=period).std()
-    
-    bb_df['BB_Upper'] = bb_df['BB_Mid'] + (rolling_std * std_dev)
-    bb_df['BB_Lower'] = bb_df['BB_Mid'] - (rolling_std * std_dev)
-    return bb_df
+
 
 def add_all_indicators(df: pd.DataFrame, column: str = 'Close') -> pd.DataFrame:
     """
@@ -68,8 +48,7 @@ def add_all_indicators(df: pd.DataFrame, column: str = 'Close') -> pd.DataFrame:
     df_out['EMA_20'] = calculate_ema(df_out, 20, 'Close')
     df_out['EMA_50'] = calculate_ema(df_out, 50, 'Close')
     
-    # RSI
-    df_out['RSI'] = calculate_rsi(df_out, 14, 'Close')
+
     
     # MACD
     macd = calculate_macd(df_out, 12, 26, 9, 'Close')
@@ -77,23 +56,7 @@ def add_all_indicators(df: pd.DataFrame, column: str = 'Close') -> pd.DataFrame:
     df_out['MACD_Signal'] = macd['MACD_Signal']
     df_out['MACD_Hist'] = macd['MACD_Hist']
     
-    # Bollinger Bands
-    bb = calculate_bollinger_bands(df_out, 20, 2, 'Close')
-    df_out['BB_Mid'] = bb['BB_Mid']
-    df_out['BB_Upper'] = bb['BB_Upper']
-    df_out['BB_Lower'] = bb['BB_Lower']
-    
-    # Donchian Channels (Turtle Trading)
-    if 'High' in df_out.columns and 'Low' in df_out.columns:
-        df_out['Donchian_High_20'] = df_out['High'].rolling(window=20).max().shift(1)
-        df_out['Donchian_Low_10'] = df_out['Low'].rolling(window=10).min().shift(1)
-        
-    # Bollinger Band Width (BB Squeeze)
-    df_out['BB_Width'] = (df_out['BB_Upper'] - df_out['BB_Lower']) / df_out['BB_Mid'] * 100
-    
-    # 20-Day Minimums (RSI Divergence)
-    df_out['Min_Close_20'] = df_out['Close'].rolling(window=20).min()
-    df_out['Min_RSI_20'] = df_out['RSI'].rolling(window=20).min()
+
     
     # Historical Prices (Dual Momentum)
     # Approx: 1M=21 days, 3M=63 days, 6M=126 days
@@ -103,5 +66,121 @@ def add_all_indicators(df: pd.DataFrame, column: str = 'Close') -> pd.DataFrame:
         
     # Daily returns
     df_out['Daily_Return'] = df_out['Close'].pct_change()
+    
+    # ==========================================
+    # New Indicators for additional strategies
+    # ==========================================
+    
+    # ADX (Average Directional Index)
+    if 'High' in df_out.columns and 'Low' in df_out.columns:
+        high = df_out['High'].astype(float)
+        low = df_out['Low'].astype(float)
+        close = df_out['Close']
+        
+        plus_dm = high.diff()
+        minus_dm = -low.diff()
+        plus_dm[plus_dm < 0] = 0
+        minus_dm[minus_dm < 0] = 0
+        # When +DM > -DM, -DM = 0 and vice versa
+        plus_dm[plus_dm <= minus_dm] = 0
+        minus_dm[minus_dm <= plus_dm] = 0
+        
+        tr1 = high - low
+        tr2 = (high - close.shift(1)).abs()
+        tr3 = (low - close.shift(1)).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        
+        atr_14 = tr.ewm(alpha=1/14, adjust=False).mean()
+        plus_di = 100 * (plus_dm.ewm(alpha=1/14, adjust=False).mean() / atr_14)
+        minus_di = 100 * (minus_dm.ewm(alpha=1/14, adjust=False).mean() / atr_14)
+        
+        dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, 0.0001)
+        adx = dx.ewm(alpha=1/14, adjust=False).mean()
+        
+        df_out['Plus_DI'] = plus_di
+        df_out['Minus_DI'] = minus_di
+        df_out['ADX'] = adx
+    
+    # Stochastic Oscillator (%K, %D)
+    if 'High' in df_out.columns and 'Low' in df_out.columns:
+        low_14 = df_out['Low'].astype(float).rolling(window=14).min()
+        high_14 = df_out['High'].astype(float).rolling(window=14).max()
+        df_out['Stoch_K'] = 100 * (df_out['Close'] - low_14) / (high_14 - low_14).replace(0, 0.0001)
+        df_out['Stoch_D'] = df_out['Stoch_K'].rolling(window=3).mean()
+    
+    # Ichimoku Cloud (이치모쿠 구름)
+    if 'High' in df_out.columns and 'Low' in df_out.columns:
+        high_9 = df_out['High'].astype(float).rolling(window=9).max()
+        low_9 = df_out['Low'].astype(float).rolling(window=9).min()
+        high_26 = df_out['High'].astype(float).rolling(window=26).max()
+        low_26 = df_out['Low'].astype(float).rolling(window=26).min()
+        high_52 = df_out['High'].astype(float).rolling(window=52).max()
+        low_52 = df_out['Low'].astype(float).rolling(window=52).min()
+        
+        tenkan = (high_9 + low_9) / 2  # Conversion Line (전환선)
+        kijun = (high_26 + low_26) / 2  # Base Line (기준선)
+        
+        df_out['Ichimoku_SpanA'] = ((tenkan + kijun) / 2).shift(26)  # Leading Span A
+        df_out['Ichimoku_SpanB'] = ((high_52 + low_52) / 2).shift(26)  # Leading Span B
+    
+    # OBV (On-Balance Volume)
+    if 'Volume' in df_out.columns:
+        volume = df_out['Volume'].astype(float)
+        close_diff = df_out['Close'].diff()
+        obv = pd.Series(0.0, index=df_out.index)
+        obv = volume.where(close_diff > 0, -volume).where(close_diff != 0, 0).cumsum()
+        df_out['OBV'] = obv
+        df_out['OBV_MA'] = obv.rolling(window=20).mean()
+    
+    # Parabolic SAR
+    if 'High' in df_out.columns and 'Low' in df_out.columns:
+        high_arr = df_out['High'].astype(float).values
+        low_arr = df_out['Low'].astype(float).values
+        close_arr = df_out['Close'].values
+        n = len(df_out)
+        psar = np.zeros(n)
+        af = 0.02
+        af_step = 0.02
+        af_max = 0.2
+        bull = True
+        ep = low_arr[0]
+        psar[0] = high_arr[0]
+        
+        for i in range(1, n):
+            if bull:
+                psar[i] = psar[i-1] + af * (ep - psar[i-1])
+                psar[i] = min(psar[i], low_arr[i-1])
+                if i >= 2:
+                    psar[i] = min(psar[i], low_arr[i-2])
+                if low_arr[i] < psar[i]:
+                    bull = False
+                    psar[i] = ep
+                    ep = low_arr[i]
+                    af = af_step
+                else:
+                    if high_arr[i] > ep:
+                        ep = high_arr[i]
+                        af = min(af + af_step, af_max)
+            else:
+                psar[i] = psar[i-1] + af * (ep - psar[i-1])
+                psar[i] = max(psar[i], high_arr[i-1])
+                if i >= 2:
+                    psar[i] = max(psar[i], high_arr[i-2])
+                if high_arr[i] > psar[i]:
+                    bull = True
+                    psar[i] = ep
+                    ep = high_arr[i]
+                    af = af_step
+                else:
+                    if low_arr[i] < ep:
+                        ep = low_arr[i]
+                        af = min(af + af_step, af_max)
+        df_out['PSAR'] = psar
+    
+    # VWAP (Volume Weighted Average Price) - rolling 20-day
+    if 'Volume' in df_out.columns and 'High' in df_out.columns and 'Low' in df_out.columns:
+        typical_price = (df_out['High'].astype(float) + df_out['Low'].astype(float) + df_out['Close']) / 3
+        vol = df_out['Volume'].astype(float)
+        df_out['VWAP'] = (typical_price * vol).rolling(window=20).sum() / vol.rolling(window=20).sum()
     
     return df_out
