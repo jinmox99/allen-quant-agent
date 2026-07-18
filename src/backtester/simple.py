@@ -216,7 +216,5 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         "RSI": simulate(rsi_sig, "RSI가 30 이하(과매도)로 떨어지면 싼 값이라 판단해 전액 매수, 70 이상(과매수)으로 올라가면 비싸다 판단해 전액 매도합니다."),
         "볼린저 밴드 (BB)": simulate(bb_sig, "주가가 볼린저 밴드 하단에 닿거나 뚫고 내려가면 전액 매수, 밴드 상단에 닿거나 뚫고 올라가면 전액 매도합니다."),
         "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum(),
-        "💎 🐢 터틀 트레이딩 (신고가 돌파)": simulate_turtle_trading(),
-        "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross(),
-        "💎 🤖 HYBRID (복합 모멘텀)": simulate_hybrid_momentum()
+        "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross()
     }

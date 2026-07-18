@@ -91,36 +91,4 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     else:
         signals["quant_momentum"] = {"status": "방향 탐색", "message": "추세 판단의 경계선에 위치해 있습니다.", "color": "#64748b"}
 
-    # 6. Turtle Trading (터틀 트레이딩)
-    donchian_high = latest['Donchian_High_20'] if 'Donchian_High_20' in latest else float('inf')
-    donchian_low = latest['Donchian_Low_10'] if 'Donchian_Low_10' in latest else 0
-    if close > donchian_high:
-        signals["turtle"] = {"status": "강력 매수 (신고가)", "message": "최근 20일간의 최고점을 시원하게 뚫었습니다! 새로운 대세 상승의 초입으로 판단됩니다.", "color": "#a855f7"}
-    elif close < donchian_low:
-        signals["turtle"] = {"status": "강력 매도 (신저가)", "message": "최근 10일간의 최저점 밑으로 무너졌습니다. 칼같은 손절이 필요한 시점입니다.", "color": "#ef4444"}
-    else:
-        signals["turtle"] = {"status": "박스권 유지", "message": "현재 포지션을 유지하며 묵묵히 추세를 따라가는 구간입니다.", "color": "#38bdf8"}
-
-    # 7. EMA Cross (골든크로스)
-    ema5 = latest['EMA_5'] if 'EMA_5' in latest else 0
-    ema20 = latest['EMA_20'] if 'EMA_20' in latest else 0
-    if ema5 > ema20:
-        signals["ema_cross"] = {"status": "상승 국면 (골든크로스)", "message": "반응이 빠른 5일 EMA가 20일 EMA 위로 올라선 단기 상승장입니다.", "color": "#10b981"}
-    elif ema5 < ema20:
-        signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e"}
-    else:
-        signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b"}
-
-    # 8. HYBRID (복합 모멘텀)
-    if rsi >= 70:
-        signals["hybrid"] = {"status": "과열 (부분 익절)", "message": "RSI가 70을 돌파하여 단기 과열되었습니다. 보유 물량의 50%를 덜어내 수익을 챙길 시점입니다.", "color": "#f59e0b"}
-    elif prev['MACD'] >= prev['MACD_Signal'] and macd < macd_signal:
-        signals["hybrid"] = {"status": "추세 붕괴 (전량 매도)", "message": "MACD 데드크로스가 발생했습니다. 상승 에너지가 끝났으므로 남은 주식을 전량 매도하고 관망해야 합니다.", "color": "#ef4444"}
-    elif rsi <= 30:
-        signals["hybrid"] = {"status": "투매 포착 (바닥 줍기)", "message": "RSI가 30 이하로 심한 투매가 나왔습니다. 현금의 50%를 투입해 바닥에서 싸게 주워 담을 시점입니다.", "color": "#a855f7"}
-    elif prev['Close'] <= prev['SMA_20'] and close > sma20:
-        signals["hybrid"] = {"status": "추세 돌파 (추격 매수)", "message": "주가가 20일선을 강하게 돌파하며 새로운 추세를 형성했습니다. 현금의 50%를 매수해 추세에 올라타세요.", "color": "#10b981"}
-    else:
-        signals["hybrid"] = {"status": "관망 (포지션 유지)", "message": "특별한 매수/매도 시그널이 없습니다. 기존의 포지션을 그대로 유지하며 다음 기회를 기다리세요.", "color": "#64748b"}
-
     return signals
