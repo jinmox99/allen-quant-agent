@@ -11,8 +11,8 @@ import os
 load_dotenv()
 
 # Import internal modules
-from src.data_loader import get_kr_stock_data, get_kr_stock_info, get_krx_cache_key
-from src.data_loader import get_us_stock_data, get_us_stock_info, get_us_cache_key
+from src.data_loader.kr_loader import get_kr_stock_data, get_kr_stock_info, get_krx_cache_key
+from src.data_loader.us_loader import get_us_stock_data, get_us_stock_info, get_us_cache_key
 from src.analyzers.indicators import add_all_indicators
 from src.analyzers.trend import analyze_trend
 from src.backtester.simple import run_indicator_backtests
