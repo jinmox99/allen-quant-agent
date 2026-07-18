@@ -312,6 +312,10 @@ st.markdown("### 🧪 지표별 수익률 백테스트 시뮬레이션")
 st.markdown(f"<p style='color:#94a3b8; font-size:14px;'>현재 설정된 기간({selected_period}) 동안 각 지표의 매매 시그널을 따랐을 때의 수익률을 비교합니다.</p>", unsafe_allow_html=True)
 
 if st.button("🚀 백테스트 실행하기", type="primary", use_container_width=True):
+    # 현재 선택된 종목과 기간을 세션 상태에 저장하여, 셀렉트박스 변경 시에도 초기화되지 않도록 함
+    st.session_state['run_bt_context'] = f"{ticker_input}_{selected_period}"
+
+if st.session_state.get('run_bt_context') == f"{ticker_input}_{selected_period}":
     with st.spinner("시뮬레이션 진행 중..."):
         backtest_results = run_indicator_backtests(df)
         
