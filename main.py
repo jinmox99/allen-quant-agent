@@ -203,8 +203,7 @@ for key, name in [('sma', '이동평균선 (SMA)'), ('macd', 'MACD'),
         trade_price = last_trade['Price']
         curr_price = float(latest['Close'])
         pct_change = (curr_price - trade_price) / trade_price * 100
-        if last_trade['Action'] == "SELL":
-            pct_change = -pct_change # If sold, price drop is positive return
+        
         trade_info_map[key] = {
             'date': last_trade['Date'],
             'action': '매수' if last_trade['Action'] == 'BUY' else '매도',
@@ -220,11 +219,14 @@ def render_status_panel(title, icon, signal, last_trade=None):
     trade_html = ""
     if last_trade:
         action_color = "#10b981" if last_trade['action'] == '매수' else "#ef4444"
+        
+        # 주가가 올랐으면 초록색, 내렸으면 빨간색으로 일관되게 표시
         change_color = "#10b981" if last_trade['pct_change'] >= 0 else "#ef4444"
+        
         trade_html = f"<div style='margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #cbd5e1;'>" \
                      f"<span style='color: #94a3b8;'>마지막 신호:</span> <strong style='color: {action_color}'>{last_trade['action']}</strong> ({last_trade['date']}) " \
                      f"<span style='margin: 0 6px;'>|</span> " \
-                     f"<span style='color: #94a3b8;'>이후 변동:</span> <strong style='color: {change_color}'>{last_trade['pct_change']:+.2f}%</strong>" \
+                     f"<span style='color: #94a3b8;'>이후 주가 변동:</span> <strong style='color: {change_color}'>{last_trade['pct_change']:+.2f}%</strong>" \
                      f"</div>"
         
     return f"""
