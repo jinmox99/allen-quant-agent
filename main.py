@@ -340,16 +340,7 @@ else:
     inc_color = '#10b981' # Green for up in US
     dec_color = '#ef4444' # Red for down in US
 
-fig = make_subplots(
-    rows=2, cols=1, 
-    shared_xaxes=True, 
-    vertical_spacing=0.05, 
-    row_heights=[0.7, 0.3],
-    subplot_titles=(
-        f"📊 주가 추세 및 이동평균선 (SMA 20/50/120)", 
-        "📈 MACD 오실레이터"
-    )
-)
+fig = go.Figure()
 
 # 1. Candlestick & Moving Averages
 fig.add_trace(go.Candlestick(
@@ -357,34 +348,60 @@ fig.add_trace(go.Candlestick(
     low=df['Low'], close=df['Close'],
     name="Candle",
     increasing_line_color=inc_color, decreasing_line_color=dec_color
-), row=1, col=1)
+))
 
-fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_20'], name="SMA 20", line=dict(color="#38bdf8", width=1.5)), row=1, col=1)
-fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_50'], name="SMA 50", line=dict(color="#f59e0b", width=1.5)), row=1, col=1)
-fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_120'], name="SMA 120", line=dict(color="#ec4899", width=1.5)), row=1, col=1)
+fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_20'], name="SMA 20", line=dict(color="#38bdf8", width=1.5)))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_50'], name="SMA 50", line=dict(color="#f59e0b", width=1.5)))
+fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_120'], name="SMA 120", line=dict(color="#ec4899", width=1.5)))
 
-
-
-# 2. MACD
-colors_macd = ['#10b981' if val >= 0 else '#ef4444' for val in df['MACD_Hist']]
-fig.add_trace(go.Bar(x=df['Date'], y=df['MACD_Hist'], marker_color=colors_macd, name="MACD Hist"), row=2, col=1)
-fig.add_trace(go.Scatter(x=df['Date'], y=df['MACD'], line=dict(color="#38bdf8", width=1.5), name="MACD"), row=2, col=1)
-fig.add_trace(go.Scatter(x=df['Date'], y=df['MACD_Signal'], line=dict(color="#f59e0b", width=1.5), name="Signal"), row=2, col=1)
-
+# Add strategy final buy/sell signals on the chart
+for idx, (name, strategy_display_name) in enumerate([
+    ("이동평균선 (SMA)", "SMA"),
+    ("MACD", "MACD"),
+    ("💎 퀀트 모멘텀 (알파 추구형)", "퀀트모멘텀"),
+    ("💎 ⚡ 골든크로스 EMA (5/20)", "EMA교차"),
+    ("💎 🛡️ 듀얼 모멘텀", "듀얼모멘텀")
+]):
+    if backtest_results and name in backtest_results and backtest_results[name]['trades']:
+        last_trade = backtest_results[name]['trades'][-1]
+        action = last_trade['Action']
+        price = last_trade['Price']
+        date = last_trade['Date']
+        color = "#10b981" if action == "BUY" else "#ef4444"
+        text_action = "매수" if action == "BUY" else "매도"
+        
+        # Stagger vertical offsets to prevent label overlap
+        offset = -30 - (idx * 22) if action == "BUY" else 30 + (idx * 22)
+        
+        fig.add_annotation(
+            x=date,
+            y=price,
+            text=f"{strategy_display_name}: {text_action}",
+            showarrow=True,
+            arrowhead=2,
+            arrowcolor=color,
+            arrowsize=1,
+            arrowwidth=1.5,
+            ax=0,
+            ay=offset,
+            bgcolor="rgba(13, 15, 20, 0.85)",
+            bordercolor=color,
+            borderwidth=1.5,
+            borderpad=4,
+            font=dict(color=color, size=9),
+            opacity=0.95
+        )
 
 fig.update_layout(
+    title=dict(text="📊 주가 추세 및 이동평균선 (SMA 20/50/120)", font=dict(size=16, color="#94a3b8")),
     template="plotly_dark",
-    height=700,
+    height=600,
     xaxis_rangeslider_visible=False,
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     margin=dict(l=40, r=40, t=50, b=40),
     paper_bgcolor='#0d0f14',
     plot_bgcolor='#0d0f14'
 )
-
-# Update subplot titles formatting
-for annotation in fig['layout']['annotations']: 
-    annotation['font'] = dict(size=14, color="#94a3b8")
 
 st.plotly_chart(fig, use_container_width=True)
 
