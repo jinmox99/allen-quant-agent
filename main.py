@@ -385,7 +385,7 @@ format_dict = {
 }
 
 st.dataframe(
-    recent_df.style.format(format_dict).applymap(
+    recent_df.style.format(format_dict).map(
         lambda x: 'color: #ef4444' if isinstance(x, (int, float)) and x < 0 else ('color: #10b981' if isinstance(x, (int, float)) and x > 0 else ''),
         subset=['MACD_Hist']
     ), use_container_width=True)
