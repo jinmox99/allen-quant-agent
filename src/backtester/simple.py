@@ -71,38 +71,33 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
     bb_sig[(df['High'] >= df['BB_Upper']) | (df['Close'] >= df['BB_Upper']*0.99)] = -1
 
     # ==========================================
-    # Smart Strategy: AI 실전 스윙 매매
+    # Smart Strategy: 퀀트 모멘텀 (알파 추구형)
     # ==========================================
     
-    def simulate_ai_swing():
-        desc = "100% 현금으로 관망하며 시작합니다. 투매 시(RSI <= 30 또는 밴드 하단 터치) 보유 현금의 50%를 투입하여 바닥에서 분할 매수하고, 과열 시(RSI >= 70 또는 밴드 상단 돌파) 보유 주식의 50%를 분할 익절하는 가장 현실적인 실전 스윙 퀀트 전략입니다."
-        cash = initial_capital
-        shares = 0.0
-        trades = []
+    def simulate_quant_momentum():
+        desc = "Buy&Hold를 이기기 위한 알파 추구형 전략입니다. 100% 주식으로 시작하며 자잘한 하락에는 흔들리지 않고 보유합니다. 주가가 20일선 아래로 무너지고 동시에 MACD마저 데드크로스가 났을 때만 '진짜 폭락장'으로 간주하여 100% 현금화(전액 매도)로 대피합니다. 이후 둘 중 하나라도 회복되면 즉시 상승장에 100% 재탑승합니다."
+        cash = 0.0
+        shares = initial_capital / float(df['Close'].iloc[0])
+        trades = [{"Date": dates.iloc[0], "Action": "BUY", "Price": float(df['Close'].iloc[0]), "Shares": shares, "Reason": "초기 100% 매수"}]
         
-        for i in range(len(df)):
+        for i in range(1, len(df)):
             close_p = float(df['Close'].iloc[i])
-            high_p = float(df['High'].iloc[i])
-            low_p = float(df['Low'].iloc[i])
-            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
-            bb_upper = float(df['BB_Upper'].iloc[i]) if not np.isnan(df['BB_Upper'].iloc[i]) else float('inf')
-            bb_lower = float(df['BB_Lower'].iloc[i]) if not np.isnan(df['BB_Lower'].iloc[i]) else 0
+            sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
+            macd = float(df['MACD'].iloc[i]) if not np.isnan(df['MACD'].iloc[i]) else 0
+            macd_signal = float(df['MACD_Signal'].iloc[i]) if not np.isnan(df['MACD_Signal'].iloc[i]) else 0
             date_str = dates.iloc[i]
             
-            # 매수 (Buy on Dip)
-            if (rsi <= 30 or low_p <= bb_lower) and cash > 10:
-                buy_cash = cash * 0.5
-                buy_shares = buy_cash / close_p
-                shares += buy_shares
-                cash -= buy_cash
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "투매 포착 (보유 현금 50% 매수)"})
+            # 매도 (진짜 폭락장 대피)
+            if (close_p < sma20 and macd < macd_signal) and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "추세/모멘텀 붕괴 (100% 대피)"})
+                shares = 0.0
                 
-            # 매도 (Sell on Rip)
-            elif (rsi >= 70 or high_p >= bb_upper) and shares > 0:
-                sell_shares = shares * 0.5
-                cash += sell_shares * close_p
-                shares -= sell_shares
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "과열 징후 (보유 주식 50% 익절)"})
+            # 매수 (상승장 재탑승)
+            elif (close_p > sma20 or macd > macd_signal) and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "상승 추세 회복 (100% 재탑승)"})
+                cash = 0.0
                 
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
@@ -113,5 +108,5 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         "MACD": simulate(macd_sig, "단기 추세선이 장기 추세선을 상향 돌파(골든크로스)하면 전액 매수, 하향 돌파(데드크로스)하면 전액 매도합니다."),
         "RSI": simulate(rsi_sig, "RSI가 30 이하(과매도)로 떨어지면 싼 값이라 판단해 전액 매수, 70 이상(과매수)으로 올라가면 비싸다 판단해 전액 매도합니다."),
         "볼린저 밴드 (BB)": simulate(bb_sig, "주가가 볼린저 밴드 하단에 닿거나 뚫고 내려가면 전액 매수, 밴드 상단에 닿거나 뚫고 올라가면 전액 매도합니다."),
-        "💎 AI 실전 스윙 전략": simulate_ai_swing()
+        "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum()
     }
