@@ -7,13 +7,15 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     if df.empty or len(df) < 50:
         default_signal = {"status": "데이터 부족", "message": "데이터가 부족합니다.", "color": "#94a3b8"}
         return {
+
             "sma": default_signal,
             "macd": default_signal,
             "rsi": default_signal,
             "bb": default_signal,
             "quant_momentum": default_signal,
             "turtle": default_signal,
-            "ema_cross": default_signal
+            "ema_cross": default_signal,
+            "hybrid": default_signal
         }
         
     latest = df.iloc[-1]
@@ -108,5 +110,17 @@ def analyze_trend(df: pd.DataFrame) -> dict:
         signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e"}
     else:
         signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b"}
+
+    # 8. HYBRID (복합 모멘텀)
+    if rsi >= 70:
+        signals["hybrid"] = {"status": "과열 (부분 익절)", "message": "RSI가 70을 돌파하여 단기 과열되었습니다. 보유 물량의 50%를 덜어내 수익을 챙길 시점입니다.", "color": "#f59e0b"}
+    elif macd_prev >= macd_signal_prev and macd < macd_signal:
+        signals["hybrid"] = {"status": "추세 붕괴 (전량 매도)", "message": "MACD 데드크로스가 발생했습니다. 상승 에너지가 끝났으므로 남은 주식을 전량 매도하고 관망해야 합니다.", "color": "#ef4444"}
+    elif rsi <= 30:
+        signals["hybrid"] = {"status": "투매 포착 (바닥 줍기)", "message": "RSI가 30 이하로 심한 투매가 나왔습니다. 현금의 50%를 투입해 바닥에서 싸게 주워 담을 시점입니다.", "color": "#a855f7"}
+    elif prev['Close'] <= prev['SMA_20'] and close > sma20:
+        signals["hybrid"] = {"status": "추세 돌파 (추격 매수)", "message": "주가가 20일선을 강하게 돌파하며 새로운 추세를 형성했습니다. 현금의 50%를 매수해 추세에 올라타세요.", "color": "#10b981"}
+    else:
+        signals["hybrid"] = {"status": "관망 (포지션 유지)", "message": "특별한 매수/매도 시그널이 없습니다. 기존의 포지션을 그대로 유지하며 다음 기회를 기다리세요.", "color": "#64748b"}
 
     return signals

@@ -158,6 +158,57 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
 
+    def simulate_hybrid_momentum():
+        desc = "애플과 하이닉스 같은 대형 우량주에 최적화된 복합 모멘텀(HYBRID) 전략입니다. 20일선 상향 돌파 시 보유 현금의 50%를 추세 매수하고, RSI 30 이하 폭락 시 남은 현금의 50%를 투매 줍기로 매수합니다. 매도는 RSI 70 이상 과열 시 절반(50%)만 익절하고, MACD 데드크로스 발생 시 상승 에너지가 끝났다고 보아 전량(100%) 매도(손절/익절)하여 도망칩니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        
+        for i in range(1, len(df)):
+            close_p = float(df['Close'].iloc[i])
+            close_p_prev = float(df['Close'].iloc[i-1])
+            sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
+            sma20_prev = float(df['SMA_20'].iloc[i-1]) if not np.isnan(df['SMA_20'].iloc[i-1]) else 0
+            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
+            macd = float(df['MACD'].iloc[i]) if not np.isnan(df['MACD'].iloc[i]) else 0
+            macd_signal = float(df['MACD_Signal'].iloc[i]) if not np.isnan(df['MACD_Signal'].iloc[i]) else 0
+            macd_prev = float(df['MACD'].iloc[i-1]) if not np.isnan(df['MACD'].iloc[i-1]) else 0
+            macd_signal_prev = float(df['MACD_Signal'].iloc[i-1]) if not np.isnan(df['MACD_Signal'].iloc[i-1]) else 0
+            date_str = dates.iloc[i]
+            
+            # 매수 1 (추세 돌파: 20일선 상향 돌파)
+            if close_p_prev <= sma20_prev and close_p > sma20 and cash > 10:
+                buy_cash = cash * 0.5
+                buy_shares = buy_cash / close_p
+                shares += buy_shares
+                cash -= buy_cash
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "추세 돌파 (20일선 돌파, 50% 매수)"})
+                
+            # 매수 2 (투매 줍기: RSI <= 30)
+            elif rsi <= 30 and cash > 10:
+                buy_cash = cash * 0.5
+                buy_shares = buy_cash / close_p
+                shares += buy_shares
+                cash -= buy_cash
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "투매 포착 (RSI 30 이하, 50% 매수)"})
+                
+            # 매도 1 (과열 익절: RSI >= 70)
+            elif rsi >= 70 and shares > 0:
+                sell_shares = shares * 0.5
+                cash += sell_shares * close_p
+                shares -= sell_shares
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "과열 징후 (RSI 70 이상, 50% 익절)"})
+                
+            # 매도 2 (추세 붕괴: MACD 데드크로스)
+            elif macd_prev >= macd_signal_prev and macd < macd_signal and shares > 0:
+                sell_shares = shares
+                cash += sell_shares * close_p
+                shares -= sell_shares
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "추세 붕괴 (MACD 데드크로스, 전량 매도)"})
+                
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+
     return {
         "단순 보유 (Buy & Hold)": {"return": bh_return, "trades": bh_trades, "desc": "가장 기본이 되는 벤치마크. 첫날에 현금을 전액 주식에 몰빵한 뒤, 끝까지 가만히 들고 있었을 경우의 수익률입니다."},
         "이동평균선 (SMA)": simulate(sma_sig, "주가가 20일선 위로 올라타면 전액 매수, 20일선 밑으로 깨고 내려가면 전액 매도합니다. 대세 추세를 따라갈 때 유리합니다."),
@@ -166,5 +217,6 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         "볼린저 밴드 (BB)": simulate(bb_sig, "주가가 볼린저 밴드 하단에 닿거나 뚫고 내려가면 전액 매수, 밴드 상단에 닿거나 뚫고 올라가면 전액 매도합니다."),
         "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum(),
         "💎 🐢 터틀 트레이딩 (신고가 돌파)": simulate_turtle_trading(),
-        "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross()
+        "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross(),
+        "💎 🤖 HYBRID (복합 모멘텀)": simulate_hybrid_momentum()
     }
