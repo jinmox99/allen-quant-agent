@@ -185,12 +185,50 @@ with col_kp4:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- AI TREND MONITOR PANELS (개별 지표) -----------------
+# ----------------- INDICATOR CALCULATION -----------------
+df = add_all_indicators(df)
+latest = df.iloc[-1]
+trend_result = analyze_trend(df)
+
+# Run backtests to get last trade info
+backtest_results = run_indicator_backtests(df)
+
+trade_info_map = {}
+for key, name in [('sma', '이동평균선 (SMA)'), ('macd', 'MACD'), 
+                  ('quant_momentum', '💎 퀀트 모멘텀 (알파 추구형)'), 
+                  ('ema_cross', '💎 ⚡ 골든크로스 EMA (5/20)'), 
+                  ('dual_momentum', '💎 🛡️ 듀얼 모멘텀')]:
+    if backtest_results and name in backtest_results and backtest_results[name]['trades']:
+        last_trade = backtest_results[name]['trades'][-1]
+        trade_price = last_trade['Price']
+        curr_price = float(latest['Close'])
+        pct_change = (curr_price - trade_price) / trade_price * 100
+        if last_trade['Action'] == "SELL":
+            pct_change = -pct_change # If sold, price drop is positive return
+        trade_info_map[key] = {
+            'date': last_trade['Date'],
+            'action': '매수' if last_trade['Action'] == 'BUY' else '매도',
+            'pct_change': pct_change
+        }
+
 st.markdown("### 🎯 개별 지표별 AI 분석 결과")
 col_s1, col_s2 = st.columns(2)
 
-def render_status_panel(title, icon, signal):
+def render_status_panel(title, icon, signal, last_trade=None):
     bg_color = f"rgba({int(signal['color'][1:3], 16)}, {int(signal['color'][3:5], 16)}, {int(signal['color'][5:7], 16)}, 0.15)"
+    
+    trade_html = ""
+    if last_trade:
+        action_color = "#10b981" if last_trade['action'] == '매수' else "#ef4444"
+        change_color = "#10b981" if last_trade['pct_change'] >= 0 else "#ef4444"
+        trade_html = f"""
+        <div style='margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #cbd5e1;'>
+            <span style='color: #94a3b8;'>마지막 신호:</span> <strong style='color: {action_color}'>{last_trade['action']}</strong> ({last_trade['date']})
+            <span style='margin: 0 6px;'>|</span>
+            <span style='color: #94a3b8;'>이후 변동:</span> <strong style='color: {change_color}'>{last_trade['pct_change']:+.2f}%</strong>
+        </div>
+        """
+        
     return f"""
     <div class='status-panel' style='background-color: {bg_color}; border-color: {signal['color']}; margin-top: 0px; margin-bottom: 16px; padding: 20px;'>
         <div style='font-size: 32px;'>{icon}</div>
@@ -198,15 +236,16 @@ def render_status_panel(title, icon, signal):
             <div style='color: #94a3b8; font-size: 13px; font-weight: 600; margin-bottom: 2px;'>{title}</div>
             <div style='color: {signal['color']}; font-size: 18px; font-weight: 800; margin-bottom: 4px;'>{signal['status']}</div>
             <div style='color: #e2e8f0; font-size: 14px; line-height: 1.4;'>{signal['message']}</div>
+            {trade_html}
         </div>
     </div>
     """
 
 with col_s1:
-    st.markdown(render_status_panel("이동평균선 (SMA)", "📊", trend_result['sma']), unsafe_allow_html=True)
+    st.markdown(render_status_panel("이동평균선 (SMA)", "📊", trend_result['sma'], trade_info_map.get('sma')), unsafe_allow_html=True)
 
 with col_s2:
-    st.markdown(render_status_panel("MACD 오실레이터", "📈", trend_result['macd']), unsafe_allow_html=True)
+    st.markdown(render_status_panel("MACD 오실레이터", "📈", trend_result['macd'], trade_info_map.get('macd')), unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -225,7 +264,7 @@ ACTIVE_STRATEGIES = [
 cols = st.columns(2)
 for i, (name, icon, key) in enumerate(ACTIVE_STRATEGIES):
     with cols[i % 2]:
-        st.markdown(render_status_panel(name, icon, trend_result.get(key, {"status": "오류", "color": "#ef4444", "message": ""})), unsafe_allow_html=True)
+        st.markdown(render_status_panel(name, icon, trend_result.get(key, {"status": "오류", "color": "#ef4444", "message": ""}), trade_info_map.get(key)), unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -239,14 +278,13 @@ else:
     dec_color = '#ef4444' # Red for down in US
 
 fig = make_subplots(
-    rows=3, cols=1, 
+    rows=2, cols=1, 
     shared_xaxes=True, 
     vertical_spacing=0.05, 
-    row_heights=[0.6, 0.2, 0.2],
+    row_heights=[0.7, 0.3],
     subplot_titles=(
         f"📊 주가 추세 및 이동평균선 (SMA 20/50/120)", 
-        "📈 MACD 오실레이터", 
-        "📉 상대강도지수 (RSI)"
+        "📈 MACD 오실레이터"
     )
 )
 
@@ -280,16 +318,10 @@ fig.add_trace(go.Bar(x=df['Date'], y=df['MACD_Hist'], marker_color=colors_macd, 
 fig.add_trace(go.Scatter(x=df['Date'], y=df['MACD'], line=dict(color="#38bdf8", width=1.5), name="MACD"), row=2, col=1)
 fig.add_trace(go.Scatter(x=df['Date'], y=df['MACD_Signal'], line=dict(color="#f59e0b", width=1.5), name="Signal"), row=2, col=1)
 
-# 3. RSI
-fig.add_trace(go.Scatter(x=df['Date'], y=df['RSI'], line=dict(color="#a855f7", width=2), name="RSI"), row=3, col=1)
-fig.add_hline(y=70, line_dash="dash", line_color="#ef4444", row=3, col=1)
-fig.add_hline(y=30, line_dash="dash", line_color="#10b981", row=3, col=1)
-fig.add_hrect(y0=30, y1=70, fillcolor="rgba(168, 85, 247, 0.1)", layer="below", line_width=0, row=3, col=1)
-
 
 fig.update_layout(
     template="plotly_dark",
-    height=800,
+    height=700,
     xaxis_rangeslider_visible=False,
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     margin=dict(l=40, r=40, t=50, b=40),
@@ -340,6 +372,7 @@ if st.session_state.get('run_bt_context') == f"{ticker_input}_{selected_period}"
             st.error("백테스트를 위한 데이터가 부족합니다.")
         else:
             # Separate Buy & Hold from the active trading strategies
+            backtest_results.pop("이동평균선 (SMA)", None)
             bh_data = backtest_results.pop("단순 보유 (Buy & Hold)", {"return": 0, "mdd": 0})
             bh_return = bh_data.get("return", 0)
             bh_mdd = bh_data.get("mdd", 0)
