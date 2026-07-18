@@ -119,6 +119,7 @@ def load_favorites():
         "KR": {
             "삼성전자": "005930",
             "SK하이닉스": "000660",
+            "TIGER 200": "102110",
             "KODEX 200 (코스피200 ETF)": "069500"
         },
         "US": {
@@ -149,7 +150,7 @@ with st.sidebar:
     fav_selection = st.selectbox("⭐ 즐겨찾기 종목", list(FAVORITES.keys()), index=1 if len(FAVORITES) > 1 else 0)
     
     if fav_selection == "🌟 직접 입력":
-        default_ticker = "000660" if is_kr else "AAPL"
+        default_ticker = "102110" if is_kr else "AAPL"
         ticker_input = st.text_input("종목 코드 (Ticker) 직접 입력", value=default_ticker).strip().upper()
     else:
         ticker_input = FAVORITES[fav_selection]
