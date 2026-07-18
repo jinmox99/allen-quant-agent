@@ -93,36 +93,9 @@ st.markdown("""
         gap: 20px;
     }
     
-    /* Star Button Customization */
-    div[data-testid="column"] {
-        position: relative;
-    }
-    div[data-testid="column"] div.element-container:has(button) {
-        position: relative;
-        z-index: 999;
-    }
-    div[data-testid="column"] button {
-        position: absolute !important;
-        top: 20px !important;
-        right: 20px !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: #facc15 !important;
-        font-size: 26px !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        height: auto !important;
-        line-height: 1 !important;
-        z-index: 999 !important;
-    }
-    div[data-testid="column"] button:hover {
-        transform: scale(1.15);
-        background: transparent !important;
-    }
-    div[data-testid="column"] button:focus {
-        background: transparent !important;
-        color: #facc15 !important;
+    /* Star Favorite Button - minimal styling */
+    button[kind="secondary"] {
+        /* default Streamlit buttons - no changes */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -221,7 +194,6 @@ trend_result = analyze_trend(df)
 col_kp1, col_kp2, col_kp3, col_kp4 = st.columns(4)
 
 with col_kp1:
-
     is_favorite = False
     fav_key = None
     for k, v in user_favorites[market_key].items():
@@ -229,23 +201,25 @@ with col_kp1:
             is_favorite = True
             fav_key = k
             break
-            
-    btn_label = "⭐" if is_favorite else "☆"
-    if st.button(btn_label, key="fav_star_btn", help="즐겨찾기 추가/해제"):
+
+    star_icon = "⭐" if is_favorite else "☆"
+    star_color = "#facc15" if is_favorite else "#64748b"
+    st.markdown(f"""
+    <div class='metric-card' style='position: relative;'>
+        <span style='position: absolute; top: 12px; right: 14px; font-size: 22px; color: {star_color};'>{star_icon}</span>
+        <div class='metric-title'>분석 대상 종목</div>
+        <div class='metric-value' style='color: #818cf8; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{info['name']}</div>
+        <div class='metric-sub' style='color: #64748b;'>{ticker_input} ({'KRX' if is_kr else 'US'})</div>
+    </div>
+    """, unsafe_allow_html=True)
+    fav_btn_text = "즐겨찾기 해제" if is_favorite else "즐겨찾기 추가"
+    if st.button(f"{star_icon} {fav_btn_text}", key="fav_star_btn", use_container_width=True):
         if is_favorite:
             del user_favorites[market_key][fav_key]
         else:
             user_favorites[market_key][info['name']] = ticker_input
         save_favorites(user_favorites)
         st.rerun()
-
-    st.markdown(f"""
-    <div class='metric-card' style='margin-top: -55px; position: relative; z-index: 1;'>
-        <div class='metric-title'>분석 대상 종목</div>
-        <div class='metric-value' style='color: #818cf8; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{info['name']}</div>
-        <div class='metric-sub' style='color: #64748b;'>{ticker_input} ({'KRX' if is_kr else 'US'})</div>
-    </div>
-    """, unsafe_allow_html=True)
     
 with col_kp2:
     st.markdown(f"""
