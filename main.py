@@ -325,13 +325,7 @@ with col_s2:
 ACTIVE_STRATEGIES = [
     ("퀀트 모멘텀", "💎", "quant_momentum"),
     ("EMA 5/20 교차", "⚡", "ema_cross"),
-    ("듀얼 모멘텀", "🛡️", "dual_momentum"),
-    ("ADX 추세 강도", "📊", "adx_trend"),
-    ("스토캐스틱", "🔄", "stochastic"),
-    ("이치모쿠 구름", "☁️", "ichimoku"),
-    ("OBV 거래량 균형", "📦", "obv"),
-    ("파라볼릭 SAR", "🔴", "parabolic_sar"),
-    ("VWAP 기관 추종", "🏛️", "vwap")
+    ("듀얼 모멘텀", "🛡️", "dual_momentum")
 ]
 
 # 한 줄에 2개씩 패널 배치
