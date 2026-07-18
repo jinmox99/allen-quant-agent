@@ -18,19 +18,18 @@ def get_kr_assets():
 _KRX_LISTING_CACHE = None
 
 def get_kr_stock_name(ticker: str) -> str:
-    """Gets the Korean stock name dynamically from FDR."""
-    global _KRX_LISTING_CACHE
-    if _KRX_LISTING_CACHE is None:
-        try:
-            _KRX_LISTING_CACHE = fdr.StockListing('KRX')
-        except Exception:
-            return f"한국 종목 ({ticker})"
-            
+    """Gets the Korean stock name dynamically using yfinance to avoid KRX IP blocking on cloud."""
     try:
-        # StockListing returns a DataFrame with 'Code' and 'Name'
-        matches = _KRX_LISTING_CACHE[_KRX_LISTING_CACHE['Code'] == ticker]
-        if not matches.empty:
-            return matches.iloc[0]['Name']
+        import yfinance as yf
+        # Try KOSPI first (.KS)
+        info = yf.Ticker(f"{ticker}.KS").info
+        if 'shortName' in info and info['shortName']:
+            return info['shortName']
+            
+        # Try KOSDAQ next (.KQ)
+        info = yf.Ticker(f"{ticker}.KQ").info
+        if 'shortName' in info and info['shortName']:
+            return info['shortName']
     except Exception:
         pass
         
