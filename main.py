@@ -93,7 +93,37 @@ st.markdown("""
         gap: 20px;
     }
     
-    /* We removed fragile CSS selectors for the star button. Javascript will handle it reliably. */
+    /* Star Button Customization */
+    div[data-testid="column"] {
+        position: relative;
+    }
+    div[data-testid="column"] div.element-container:has(button) {
+        position: relative;
+        z-index: 999;
+    }
+    div[data-testid="column"] button {
+        position: absolute !important;
+        top: 20px !important;
+        right: 20px !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #facc15 !important;
+        font-size: 26px !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        line-height: 1 !important;
+        z-index: 999 !important;
+    }
+    div[data-testid="column"] button:hover {
+        transform: scale(1.15);
+        background: transparent !important;
+    }
+    div[data-testid="column"] button:focus {
+        background: transparent !important;
+        color: #facc15 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -216,8 +246,13 @@ with col_kp1:
         save_favorites(user_favorites)
         st.rerun()
 
-    # JS hack to style the button perfectly regardless of Streamlit DOM changes
-    st.markdown('<img src="x" onerror="const buttons = window.document.querySelectorAll(\'button\'); buttons.forEach(btn => { if (btn.innerText.includes(\'⭐\') || btn.innerText.includes(\'☆\')) { btn.style.position = \'absolute\'; btn.style.top = \'15px\'; btn.style.right = \'15px\'; btn.style.background = \'transparent\'; btn.style.border = \'none\'; btn.style.boxShadow = \'none\'; btn.style.color = \'#facc15\'; btn.style.fontSize = \'26px\'; btn.style.zIndex = \'999\'; btn.style.padding = \'0\'; const col = btn.closest(\'div[data-testid=\\\'column\\\']\'); if(col) col.style.position = \'relative\'; const cont = btn.closest(\'div.element-container\'); if(cont) { cont.style.height = \'0px\'; cont.style.minHeight = \'0px\'; cont.style.margin = \'0px\'; } } });" style="display:none;">', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class='metric-card' style='margin-top: -55px; position: relative; z-index: 1;'>
+        <div class='metric-title'>분석 대상 종목</div>
+        <div class='metric-value' style='color: #818cf8; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{info['name']}</div>
+        <div class='metric-sub' style='color: #64748b;'>{ticker_input} ({'KRX' if is_kr else 'US'})</div>
+    </div>
+    """, unsafe_allow_html=True)
     
 with col_kp2:
     st.markdown(f"""
