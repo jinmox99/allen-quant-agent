@@ -55,12 +55,15 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None)
         end_date = datetime.now().strftime('%Y-%m-%d')
         
     try:
-        # Try KOSPI first
-        df = yf.download(f"{ticker}.KS", start=start_date, end=end_date, progress=False)
-        
-        # If empty, try KOSDAQ
-        if df.empty:
-            df = yf.download(f"{ticker}.KQ", start=start_date, end=end_date, progress=False)
+        # If the ticker is already a global index (like ^KS200, ^KS11), download directly
+        if ticker.startswith("^"):
+            df = yf.download(ticker, start=start_date, end=end_date, progress=False)
+        else:
+            # Try KOSPI first
+            df = yf.download(f"{ticker}.KS", start=start_date, end=end_date, progress=False)
+            # If empty, try KOSDAQ
+            if df.empty:
+                df = yf.download(f"{ticker}.KQ", start=start_date, end=end_date, progress=False)
             
         if df.empty:
             raise ValueError(f"No data returned for KR ticker: {ticker}")
