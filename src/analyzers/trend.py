@@ -13,9 +13,7 @@ def analyze_trend(df: pd.DataFrame) -> dict:
             "rsi": default_signal,
             "bb": default_signal,
             "quant_momentum": default_signal,
-            "turtle": default_signal,
-            "ema_cross": default_signal,
-            "hybrid": default_signal
+            "ema_cross": default_signal
         }
         
     latest = df.iloc[-1]
@@ -90,5 +88,15 @@ def analyze_trend(df: pd.DataFrame) -> dict:
         signals["quant_momentum"] = {"status": "양호 (추세 유지)", "message": "상승 추세 혹은 모멘텀이 살아있어 100% 주식을 보유하며 끝까지 수익을 극대화할 수 있는 구간입니다.", "color": "#10b981"}
     else:
         signals["quant_momentum"] = {"status": "방향 탐색", "message": "추세 판단의 경계선에 위치해 있습니다.", "color": "#64748b"}
+
+    # 6. EMA Cross (골든크로스)
+    ema5 = latest['EMA_5'] if 'EMA_5' in latest else 0
+    ema20 = latest['EMA_20'] if 'EMA_20' in latest else 0
+    if ema5 > ema20:
+        signals["ema_cross"] = {"status": "상승 국면 (골든크로스)", "message": "반응이 빠른 5일 EMA가 20일 EMA 위로 올라선 단기 상승장입니다.", "color": "#10b981"}
+    elif ema5 < ema20:
+        signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e"}
+    else:
+        signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b"}
 
     return signals
