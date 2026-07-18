@@ -1,7 +1,8 @@
 {
   "KR": {
     "SK hynix": "000660",
-    "SamsungElec": "005930"
+    "SamsungElec": "005930",
+    "코스피 200 지수": "^KS200"
   },
   "US": {
     "애플 (AAPL)": "AAPL",
