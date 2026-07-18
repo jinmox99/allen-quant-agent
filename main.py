@@ -212,6 +212,21 @@ with col_s2:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# ----------------- AI SMART STRATEGIES PANELS -----------------
+st.markdown("### 💎 초과 수익 달성형 (알파) 지표 상태")
+st.markdown("<p style='color:#94a3b8; font-size:14px;'>Buy & Hold 벤치마크를 넘어서기 위해 설계된 공격적 추세 추종 전략들의 현재 시그널입니다.</p>", unsafe_allow_html=True)
+
+col_a1, col_a2, col_a3 = st.columns(3)
+
+with col_a1:
+    st.markdown(render_status_panel("퀀트 모멘텀", "💎", trend_result.get('quant_momentum', {"status": "오류", "color": "#ef4444", "message": ""})), unsafe_allow_html=True)
+with col_a2:
+    st.markdown(render_status_panel("터틀 트레이딩", "🐢", trend_result.get('turtle', {"status": "오류", "color": "#ef4444", "message": ""})), unsafe_allow_html=True)
+with col_a3:
+    st.markdown(render_status_panel("EMA 5/20 교차", "⚡", trend_result.get('ema_cross', {"status": "오류", "color": "#ef4444", "message": ""})), unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
 # ----------------- ADVANCED CHARTING (Plotly) -----------------
 # Candlestick colors: US (Green/Red), KR (Red/Blue)
 if is_kr:

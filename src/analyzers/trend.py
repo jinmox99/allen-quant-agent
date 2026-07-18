@@ -10,7 +10,10 @@ def analyze_trend(df: pd.DataFrame) -> dict:
             "sma": default_signal,
             "macd": default_signal,
             "rsi": default_signal,
-            "bb": default_signal
+            "bb": default_signal,
+            "quant_momentum": default_signal,
+            "turtle": default_signal,
+            "ema_cross": default_signal
         }
         
     latest = df.iloc[-1]
@@ -77,5 +80,33 @@ def analyze_trend(df: pd.DataFrame) -> dict:
             signals["bb"] = {"status": "밴드 수축 (응축기)", "message": "밴드 폭이 매우 좁아 변동성이 축소된 상태로, 조만간 큰 방향성 분출이 예상됩니다.", "color": "#38bdf8"}
         else:
             signals["bb"] = {"status": "정상 변동성 구간", "message": "주가가 밴드 안에서 정상적인 변동성을 보이며 움직이고 있습니다.", "color": "#64748b"}
+
+    # 5. Quant Momentum (퀀트 모멘텀)
+    if close < sma20 and macd < macd_signal:
+        signals["quant_momentum"] = {"status": "위험 (폭락 징후)", "message": "추세선(20일)과 모멘텀(MACD)이 동시에 무너졌습니다. 전액 매도(100% 현금화)가 유리한 구간입니다.", "color": "#ef4444"}
+    elif close > sma20 or macd > macd_signal:
+        signals["quant_momentum"] = {"status": "양호 (추세 유지)", "message": "상승 추세 혹은 모멘텀이 살아있어 100% 주식을 보유하며 끝까지 수익을 극대화할 수 있는 구간입니다.", "color": "#10b981"}
+    else:
+        signals["quant_momentum"] = {"status": "방향 탐색", "message": "추세 판단의 경계선에 위치해 있습니다.", "color": "#64748b"}
+
+    # 6. Turtle Trading (터틀 트레이딩)
+    donchian_high = latest['Donchian_High_20'] if 'Donchian_High_20' in latest else float('inf')
+    donchian_low = latest['Donchian_Low_10'] if 'Donchian_Low_10' in latest else 0
+    if close > donchian_high:
+        signals["turtle"] = {"status": "강력 매수 (신고가)", "message": "최근 20일간의 최고점을 시원하게 뚫었습니다! 새로운 대세 상승의 초입으로 판단됩니다.", "color": "#a855f7"}
+    elif close < donchian_low:
+        signals["turtle"] = {"status": "강력 매도 (신저가)", "message": "최근 10일간의 최저점 밑으로 무너졌습니다. 칼같은 손절이 필요한 시점입니다.", "color": "#ef4444"}
+    else:
+        signals["turtle"] = {"status": "박스권 유지", "message": "현재 포지션을 유지하며 묵묵히 추세를 따라가는 구간입니다.", "color": "#38bdf8"}
+
+    # 7. EMA Cross (골든크로스)
+    ema5 = latest['EMA_5'] if 'EMA_5' in latest else 0
+    ema20 = latest['EMA_20'] if 'EMA_20' in latest else 0
+    if ema5 > ema20:
+        signals["ema_cross"] = {"status": "상승 국면 (골든크로스)", "message": "반응이 빠른 5일 EMA가 20일 EMA 위로 올라선 단기 상승장입니다.", "color": "#10b981"}
+    elif ema5 < ema20:
+        signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e"}
+    else:
+        signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b"}
 
     return signals
