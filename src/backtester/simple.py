@@ -3,7 +3,8 @@ import numpy as np
 
 def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) -> dict:
     """
-    Runs simple backtests on 4 technical indicators plus Buy & Hold over the given DataFrame.
+    Runs- `[x]` Update `src/backtester/simple.py` with Strategy A, B, and Hybrid
+- `[/]` Update `main.py` UI to highlight smart strategies in chartaFrame.
     Returns a dictionary mapping strategy names to their percentage returns.
     """
     if df.empty or len(df) < 20:
@@ -54,10 +55,86 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
     bb_sig[(df['Low'] <= df['BB_Lower']) | (df['Close'] <= df['BB_Lower']*1.01)] = 1
     bb_sig[(df['High'] >= df['BB_Upper']) | (df['Close'] >= df['BB_Upper']*0.99)] = -1
 
+    # ==========================================
+    # Smart Strategies (A, B, Hybrid)
+    # ==========================================
+    
+    def simulate_strategy_A():
+        """전략 A (부분 익절): 100% 주식 시작. 과열 시 30% 매도, 20일선 터치 시 전액 재매수"""
+        cash = 0.0
+        shares = initial_capital / float(df['Close'].iloc[0])
+        for i in range(len(df)):
+            close_p = float(df['Close'].iloc[i])
+            high_p = float(df['High'].iloc[i])
+            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
+            bb_upper = float(df['BB_Upper'].iloc[i]) if not np.isnan(df['BB_Upper'].iloc[i]) else float('inf')
+            sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
+            
+            # 매도 조건 (과열): RSI >= 70 or 고가 >= 밴드 상단
+            if (rsi >= 70 or high_p >= bb_upper) and shares > 0:
+                sell_shares = shares * 0.3 # 30% 매도
+                cash += sell_shares * close_p
+                shares -= sell_shares
+            # 매수 조건 (조정): 종가 <= 20일선
+            elif close_p <= sma20 and cash > 0:
+                shares += cash / close_p
+                cash = 0.0
+                
+        final_value = cash + (shares * end_price)
+        return ((final_value - initial_capital) / initial_capital) * 100
+
+    def simulate_strategy_B():
+        """전략 B (바닥 줍기): 50% 주식/50% 현금 시작. 투매 시 현금의 50%씩 분할 매수. 매도 없음."""
+        cash = initial_capital * 0.5
+        shares = (initial_capital * 0.5) / float(df['Close'].iloc[0])
+        for i in range(len(df)):
+            close_p = float(df['Close'].iloc[i])
+            low_p = float(df['Low'].iloc[i])
+            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
+            bb_lower = float(df['BB_Lower'].iloc[i]) if not np.isnan(df['BB_Lower'].iloc[i]) else 0
+            
+            # 매수 조건 (투매): RSI <= 30 or 저가 <= 밴드 하단
+            if (rsi <= 30 or low_p <= bb_lower) and cash > 10:
+                buy_cash = cash * 0.5 # 남은 현금의 50% 사용
+                shares += buy_cash / close_p
+                cash -= buy_cash
+                
+        final_value = cash + (shares * end_price)
+        return ((final_value - initial_capital) / initial_capital) * 100
+
+    def simulate_hybrid():
+        """스마트 하이브리드 (A+B): 70% 주식/30% 현금 시작. 과열 시 30% 매도, 투매 시 현금 50% 매수."""
+        cash = initial_capital * 0.3
+        shares = (initial_capital * 0.7) / float(df['Close'].iloc[0])
+        for i in range(len(df)):
+            close_p = float(df['Close'].iloc[i])
+            high_p = float(df['High'].iloc[i])
+            low_p = float(df['Low'].iloc[i])
+            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
+            bb_upper = float(df['BB_Upper'].iloc[i]) if not np.isnan(df['BB_Upper'].iloc[i]) else float('inf')
+            bb_lower = float(df['BB_Lower'].iloc[i]) if not np.isnan(df['BB_Lower'].iloc[i]) else 0
+            
+            # 매도 (A)
+            if (rsi >= 70 or high_p >= bb_upper) and shares > 0:
+                sell_shares = shares * 0.3
+                cash += sell_shares * close_p
+                shares -= sell_shares
+            # 매수 (B)
+            elif (rsi <= 30 or low_p <= bb_lower) and cash > 10:
+                buy_cash = cash * 0.5
+                shares += buy_cash / close_p
+                cash -= buy_cash
+                
+        final_value = cash + (shares * end_price)
+        return ((final_value - initial_capital) / initial_capital) * 100
+
     return {
         "단순 보유 (Buy & Hold)": bh_return,
         "이동평균선 (SMA)": simulate(sma_sig),
         "MACD": simulate(macd_sig),
         "RSI": simulate(rsi_sig),
-        "볼린저 밴드 (BB)": simulate(bb_sig)
+        "볼린저 밴드 (BB)": simulate(bb_sig),
+        "💡 전략 A (부분 익절)": simulate_strategy_A(),
+        "💡 전략 B (바닥 줍기)": simulate_strategy_B(),
+        "💎 스마트 하이브리드": simulate_hybrid()
     }

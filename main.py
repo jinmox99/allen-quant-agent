@@ -334,11 +334,13 @@ if st.button("🚀 백테스트 실행하기", type="primary", use_container_wid
             strategies = list(backtest_results.keys())
             returns = list(backtest_results.values())
             
-            # Colors: Green for positive, Red for negative, highlight Best
+            # Colors: Green for positive, Red for negative, highlight Best, Purple for Smart Strategies
             bar_colors = []
             for s, r in zip(strategies, returns):
                 if s == best_strategy:
                     bar_colors.append("#38bdf8") # Highlight best with blue/cyan
+                elif "💡" in s or "💎" in s:
+                    bar_colors.append("#a855f7" if r >= 0 else "#d8b4fe") # Purple for smart strategies
                 elif r >= 0:
                     bar_colors.append("#10b981") # Green
                 else:
