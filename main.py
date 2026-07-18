@@ -217,35 +217,7 @@ with col_kp1:
         st.rerun()
 
     # JS hack to style the button perfectly regardless of Streamlit DOM changes
-    st.markdown("""
-    <img src="x" onerror="
-        const buttons = window.document.querySelectorAll('button');
-        buttons.forEach(btn => {
-            if (btn.innerText.includes('⭐') || btn.innerText.includes('☆')) {
-                btn.style.position = 'absolute';
-                btn.style.top = '15px';
-                btn.style.right = '15px';
-                btn.style.background = 'transparent';
-                btn.style.border = 'none';
-                btn.style.boxShadow = 'none';
-                btn.style.color = '#facc15';
-                btn.style.fontSize = '26px';
-                btn.style.zIndex = '999';
-                btn.style.padding = '0';
-                
-                const col = btn.closest('div[data-testid=\\'column\\']');
-                if(col) col.style.position = 'relative';
-                
-                const cont = btn.closest('div.element-container');
-                if(cont) { 
-                    cont.style.height = '0px'; 
-                    cont.style.minHeight = '0px'; 
-                    cont.style.margin = '0px';
-                }
-            }
-        });
-    " style="display:none;">
-    """, unsafe_allow_html=True)
+    st.markdown('<img src="x" onerror="const buttons = window.document.querySelectorAll(\'button\'); buttons.forEach(btn => { if (btn.innerText.includes(\'⭐\') || btn.innerText.includes(\'☆\')) { btn.style.position = \'absolute\'; btn.style.top = \'15px\'; btn.style.right = \'15px\'; btn.style.background = \'transparent\'; btn.style.border = \'none\'; btn.style.boxShadow = \'none\'; btn.style.color = \'#facc15\'; btn.style.fontSize = \'26px\'; btn.style.zIndex = \'999\'; btn.style.padding = \'0\'; const col = btn.closest(\'div[data-testid=\\\'column\\\']\'); if(col) col.style.position = \'relative\'; const cont = btn.closest(\'div.element-container\'); if(cont) { cont.style.height = \'0px\'; cont.style.minHeight = \'0px\'; cont.style.margin = \'0px\'; } } });" style="display:none;">', unsafe_allow_html=True)
     
 with col_kp2:
     st.markdown(f"""
