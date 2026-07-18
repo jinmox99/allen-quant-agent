@@ -29,51 +29,77 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     
     signals = {}
     
+    import numpy as np
+    
+    # helper to clip values
+    def clip_score(val):
+        return int(max(0, min(100, val)))
+        
     # 1. SMA (이동평균선) 분석
+    close_ratio = (close - sma20) / sma20 if sma20 > 0 else 0
+    sma_ratio = (sma20 - sma50) / sma50 if sma50 > 0 else 0
+    
+    score_close = ((close_ratio + 0.05) / 0.10) * 50
+    score_sma = ((sma_ratio + 0.05) / 0.10) * 50
+    sma_score = clip_score(score_close + score_sma)
+    
     if close < sma20 and sma20 < sma50:
-        signals["sma"] = {"status": "역배열 하락세", "message": "주가가 20일선 아래에 있으며, 20일선이 50일선 아래인 완연한 하락 추세입니다.", "color": "#ef4444"}
+        signals["sma"] = {"status": "역배열 하락세", "message": "주가가 20일선 아래에 있으며, 20일선이 50일선 아래인 완연한 하락 추세입니다.", "color": "#ef4444", "score": sma_score}
     elif close > sma20 and sma20 > sma50:
-        signals["sma"] = {"status": "정배열 상승세", "message": "단기, 중기 이평선이 정배열을 이루며 탄탄한 상승 추세를 그리고 있습니다.", "color": "#10b981"}
+        signals["sma"] = {"status": "정배열 상승세", "message": "단기, 중기 이평선이 정배열을 이루며 탄탄한 상승 추세를 그리고 있습니다.", "color": "#10b981", "score": sma_score}
     elif sma20 < sma20_prev and close < sma20:
-        signals["sma"] = {"status": "단기 하락 전환", "message": "20일선이 꺾이고 주가가 그 아래로 내려가 단기 하락(조정)이 진행 중입니다.", "color": "#f43f5e"}
+        signals["sma"] = {"status": "단기 하락 전환", "message": "20일선이 꺾이고 주가가 그 아래로 내려가 단기 하락(조정)이 진행 중입니다.", "color": "#f43f5e", "score": sma_score}
     elif sma20 > sma20_prev and close > sma20:
-        signals["sma"] = {"status": "단기 반등세", "message": "20일선 위로 주가가 올라타며 단기적인 반등세가 나타나고 있습니다.", "color": "#34d399"}
+        signals["sma"] = {"status": "단기 반등세", "message": "20일선 위로 주가가 올라타며 단기적인 반등세가 나타나고 있습니다.", "color": "#34d399", "score": sma_score}
     else:
-        signals["sma"] = {"status": "방향성 탐색 중", "message": "이동평균선 간 거리가 좁혀지며 뚜렷한 추세가 없는 횡보 구간입니다.", "color": "#64748b"}
+        signals["sma"] = {"status": "방향성 탐색 중", "message": "이동평균선 간 거리가 좁혀지며 뚜렷한 추세가 없는 횡보 구간입니다.", "color": "#64748b", "score": sma_score}
 
     # 2. MACD 분석
+    hist_std = df['MACD_Hist'].tail(50).std()
+    if pd.isna(hist_std) or hist_std == 0:
+        hist_std = 1.0
+    macd_z = macd_hist / hist_std
+    macd_score = clip_score(((macd_z + 2.0) / 4.0) * 100)
+    
     if macd > macd_signal and macd_hist > macd_hist_prev:
-        signals["macd"] = {"status": "강한 매수 시그널", "message": "MACD가 시그널을 상회하고 히스토그램이 커지는 상승 모멘텀 확장 구간입니다.", "color": "#10b981"}
+        signals["macd"] = {"status": "강한 매수 시그널", "message": "MACD가 시그널을 상회하고 히스토그램이 커지는 상승 모멘텀 확장 구간입니다.", "color": "#10b981", "score": macd_score}
     elif macd > macd_signal and macd_hist <= macd_hist_prev:
-        signals["macd"] = {"status": "상승 둔화", "message": "MACD가 시그널 위에 있으나 상승 탄력이 점점 줄어들고 있습니다.", "color": "#f59e0b"}
+        signals["macd"] = {"status": "상승 둔화", "message": "MACD가 시그널 위에 있으나 상승 탄력이 점점 줄어들고 있습니다.", "color": "#f59e0b", "score": macd_score}
     elif macd < macd_signal and macd_hist < macd_hist_prev:
-        signals["macd"] = {"status": "강한 매도 시그널", "message": "MACD가 시그널을 하회하며 하락 모멘텀이 거세지고 있습니다.", "color": "#ef4444"}
+        signals["macd"] = {"status": "강한 매도 시그널", "message": "MACD가 시그널을 하회하며 하락 모멘텀이 거세지고 있습니다.", "color": "#ef4444", "score": macd_score}
     elif macd < macd_signal and macd_hist >= macd_hist_prev:
-        signals["macd"] = {"status": "하락 둔화 (반등 조짐)", "message": "MACD가 시그널 아래에 있으나 하락폭이 좁혀지며 반등 에너지가 모이고 있습니다.", "color": "#38bdf8"}
+        signals["macd"] = {"status": "하락 둔화 (반등 조짐)", "message": "MACD가 시그널 아래에 있으나 하락폭이 좁혀지며 반등 에너지가 모이고 있습니다.", "color": "#38bdf8", "score": macd_score}
     else:
-        signals["macd"] = {"status": "중립 (신호 혼재)", "message": "MACD 뚜렷한 모멘텀을 보이지 않고 있습니다.", "color": "#64748b"}
-
-
+        signals["macd"] = {"status": "중립 (신호 혼재)", "message": "MACD 뚜렷한 모멘텀을 보이지 않고 있습니다.", "color": "#64748b", "score": macd_score}
 
     # 5. Quant Momentum (퀀트 모멘텀)
+    val1 = ((close_ratio + 0.05) / 0.10) * 50
+    macd_diff_std = (df['MACD'] - df['MACD_Signal']).tail(50).std()
+    if pd.isna(macd_diff_std) or macd_diff_std == 0:
+        macd_diff_std = 1.0
+    val2 = (((macd - macd_signal) / macd_diff_std + 2.0) / 4.0) * 50
+    quant_score = clip_score(val1 + val2)
+    
     if close < sma20 and macd < macd_signal:
-        signals["quant_momentum"] = {"status": "위험 (폭락 징후)", "message": "추세선(20일)과 모멘텀(MACD)이 동시에 무너졌습니다. 전액 매도(100% 현금화)가 유리한 구간입니다.", "color": "#ef4444"}
+        signals["quant_momentum"] = {"status": "위험 (폭락 징후)", "message": "추세선(20일)과 모멘텀(MACD)이 동시에 무너졌습니다. 전액 매도(100% 현금화)가 유리한 구간입니다.", "color": "#ef4444", "score": quant_score}
     elif close > sma20 or macd > macd_signal:
-        signals["quant_momentum"] = {"status": "양호 (추세 유지)", "message": "상승 추세 혹은 모멘텀이 살아있어 100% 주식을 보유하며 끝까지 수익을 극대화할 수 있는 구간입니다.", "color": "#10b981"}
+        signals["quant_momentum"] = {"status": "양호 (추세 유지)", "message": "상승 추세 혹은 모멘텀이 살아있어 100% 주식을 보유하며 끝까지 수익을 극대화할 수 있는 구간입니다.", "color": "#10b981", "score": quant_score}
     else:
-        signals["quant_momentum"] = {"status": "방향 탐색", "message": "추세 판단의 경계선에 위치해 있습니다.", "color": "#64748b"}
+        signals["quant_momentum"] = {"status": "방향 탐색", "message": "추세 판단의 경계선에 위치해 있습니다.", "color": "#64748b", "score": quant_score}
 
     # 6. EMA Cross (골든크로스)
     ema5 = latest['EMA_5'] if 'EMA_5' in latest else 0
     ema20 = latest['EMA_20'] if 'EMA_20' in latest else 0
+    ema_diff_ratio = (ema5 - ema20) / ema20 if ema20 > 0 else 0
+    ema_score = clip_score(((ema_diff_ratio + 0.03) / 0.06) * 100)
+    
     if ema5 > ema20:
-        signals["ema_cross"] = {"status": "상승 국면 (골든크로스)", "message": "반응이 빠른 5일 EMA가 20일 EMA 위로 올라선 단기 상승장입니다.", "color": "#10b981"}
+        signals["ema_cross"] = {"status": "상승 국면 (골든크로스)", "message": "반응이 빠른 5일 EMA가 20일 EMA 위로 올라선 단기 상승장입니다.", "color": "#10b981", "score": ema_score}
     elif ema5 < ema20:
-        signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e"}
+        signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e", "score": ema_score}
     else:
-        signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b"}
+        signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b", "score": ema_score}
 
-    import numpy as np
     # 9. Dual Momentum
     c1 = latest['Close_1M_ago'] if 'Close_1M_ago' in latest and not np.isnan(latest['Close_1M_ago']) else 0
     c3 = latest['Close_3M_ago'] if 'Close_3M_ago' in latest and not np.isnan(latest['Close_3M_ago']) else 0
@@ -82,12 +108,18 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     cond1 = (close > c1) if c1 > 0 else True
     cond3 = (close > c3) if c3 > 0 else True
     cond6 = (close > c6) if c6 > 0 else True
-
+    
+    ret1 = (close - c1) / c1 if c1 > 0 else 0
+    ret3 = (close - c3) / c3 if c3 > 0 else 0
+    ret6 = (close - c6) / c6 if c6 > 0 else 0
+    avg_ret = (ret1 + ret3 + ret6) / 3
+    dual_score = clip_score(((avg_ret + 0.10) / 0.20) * 100)
+    
     if cond1 and cond3 and cond6:
-        signals["dual_momentum"] = {"status": "트리플 크라운 (홀딩)", "message": "1, 3, 6개월 단기/중기/장기 모멘텀이 모두 살아있는 강력한 상승장입니다.", "color": "#10b981"}
+        signals["dual_momentum"] = {"status": "트리플 크라운 (홀딩)", "message": "1, 3, 6개월 단기/중기/장기 모멘텀이 모두 살아있는 강력한 상승장입니다.", "color": "#10b981", "score": dual_score}
     elif (not cond1) and (not cond3):
-        signals["dual_momentum"] = {"status": "모멘텀 붕괴 (현금화)", "message": "단기와 중기 모멘텀이 모두 꺾였습니다. 리스크 관리를 위해 전량 현금화가 필요합니다.", "color": "#ef4444"}
+        signals["dual_momentum"] = {"status": "모멘텀 붕괴 (현금화)", "message": "단기와 중기 모멘텀이 모두 꺾였습니다. 리스크 관리를 위해 전량 현금화가 필요합니다.", "color": "#ef4444", "score": dual_score}
     else:
-        signals["dual_momentum"] = {"status": "혼조세", "message": "타임프레임별 모멘텀이 엇갈리고 있습니다.", "color": "#f59e0b"}
+        signals["dual_momentum"] = {"status": "혼조세", "message": "타임프레임별 모멘텀이 엇갈리고 있습니다.", "color": "#f59e0b", "score": dual_score}
 
     return signals

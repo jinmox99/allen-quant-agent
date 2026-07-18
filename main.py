@@ -170,15 +170,17 @@ if not ticker_input:
 
 with st.spinner(f"'{ticker_input}' 종목 데이터 및 기술적 지표 계산 중..."):
     start_date = (datetime.now() - timedelta(days=days_to_fetch)).strftime('%Y-%m-%d')
+    # Fetch extra 250 days to ensure indicators requiring historical lookback (like Close_6M_ago, SMA_120) are fully computed from day 1
+    fetch_start_date = (datetime.now() - timedelta(days=days_to_fetch + 250)).strftime('%Y-%m-%d')
     
     if is_kr:
         info = get_kr_stock_info(ticker_input)
-        df = get_kr_stock_data(ticker_input, start_date=start_date)
+        df = get_kr_stock_data(ticker_input, start_date=fetch_start_date)
         price_unit = "원"
         price_format = f"{info['current_price']:,.0f}"
     else:
         info = get_us_stock_info(ticker_input)
-        df = get_us_stock_data(ticker_input, start_date=start_date)
+        df = get_us_stock_data(ticker_input, start_date=fetch_start_date)
         price_unit = "$"
         price_format = f"{info['current_price']:,.2f}"
 
@@ -187,7 +189,18 @@ if df.empty or len(df) < 20:
     st.stop()
 
 # ----------------- INDICATOR CALCULATION -----------------
+# Calculate indicators on the full fetched dataset (with extra lookback)
 df = add_all_indicators(df)
+
+# Slice the DataFrame to the user-selected period (for rendering and backtesting)
+df['Date_parsed'] = pd.to_datetime(df['Date'])
+df = df[df['Date_parsed'] >= pd.to_datetime(start_date)].copy()
+df = df.drop(columns=['Date_parsed']).reset_index(drop=True)
+
+if df.empty or len(df) < 2:
+    st.error("선택한 조회 기간에 해당하는 데이터가 부족합니다.")
+    st.stop()
+
 latest = df.iloc[-1]
 trend_result = analyze_trend(df)
 
@@ -284,6 +297,10 @@ col_s1, col_s2 = st.columns(2)
 def render_status_panel(title, icon, signal, last_trade=None):
     bg_color = f"rgba({int(signal['color'][1:3], 16)}, {int(signal['color'][3:5], 16)}, {int(signal['color'][5:7], 16)}, 0.15)"
     
+    score_badge = ""
+    if 'score' in signal:
+        score_badge = f"<span style='background-color: {signal['color']}; color: #ffffff; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;'>점수: {signal['score']}점</span>"
+    
     trade_html = ""
     if last_trade:
         action_color = "#10b981" if last_trade['action'] == '매수' else "#ef4444"
@@ -300,8 +317,11 @@ def render_status_panel(title, icon, signal, last_trade=None):
     return f"""
 <div class='status-panel' style='background-color: {bg_color}; border-color: {signal['color']}; margin-top: 0px; margin-bottom: 16px; padding: 20px;'>
 <div style='font-size: 32px;'>{icon}</div>
-<div>
-<div style='color: #94a3b8; font-size: 13px; font-weight: 600; margin-bottom: 2px;'>{title}</div>
+<div style='flex-grow: 1;'>
+<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;'>
+    <div style='color: #94a3b8; font-size: 13px; font-weight: 600;'>{title}</div>
+    {score_badge}
+</div>
 <div style='color: {signal['color']}; font-size: 18px; font-weight: 800; margin-bottom: 4px;'>{signal['status']}</div>
 <div style='color: #e2e8f0; font-size: 14px; line-height: 1.4;'>{signal['message']}</div>
 {trade_html}
