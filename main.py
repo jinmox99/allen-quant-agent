@@ -13,6 +13,7 @@ from src.data_loader import get_kr_stock_data, get_kr_stock_info
 from src.data_loader import get_us_stock_data, get_us_stock_info
 from src.analyzers.indicators import add_all_indicators
 from src.analyzers.trend import analyze_trend
+from src.backtester.simple import run_indicator_backtests
 
 # ----------------- PAGE CONFIG -----------------
 st.set_page_config(
@@ -304,3 +305,55 @@ format_dict = {
 }
 
 st.dataframe(recent_df.style.format(format_dict), use_container_width=True)
+
+# ----------------- BACKTEST SIMULATOR -----------------
+st.markdown("---")
+st.markdown("### 🧪 지표별 수익률 백테스트 시뮬레이션")
+st.markdown(f"<p style='color:#94a3b8; font-size:14px;'>현재 설정된 기간({selected_period}) 동안 각 지표의 매매 시그널을 따랐을 때의 수익률을 비교합니다.</p>", unsafe_allow_html=True)
+
+if st.button("🚀 백테스트 실행하기", type="primary", use_container_width=True):
+    with st.spinner("시뮬레이션 진행 중..."):
+        backtest_results = run_indicator_backtests(df)
+        
+        if not backtest_results:
+            st.error("백테스트를 위한 데이터가 부족합니다.")
+        else:
+            # Find the best strategy
+            best_strategy = max(backtest_results, key=backtest_results.get)
+            best_return = backtest_results[best_strategy]
+            
+            st.success(f"**최우수 전략 (Best Strategy): 👑 {best_strategy}** (+{best_return:.2f}%)")
+            
+            # Prepare data for Plotly Bar Chart
+            strategies = list(backtest_results.keys())
+            returns = list(backtest_results.values())
+            
+            # Colors: Green for positive, Red for negative, highlight Best
+            bar_colors = []
+            for s, r in zip(strategies, returns):
+                if s == best_strategy:
+                    bar_colors.append("#38bdf8") # Highlight best with blue/cyan
+                elif r >= 0:
+                    bar_colors.append("#10b981") # Green
+                else:
+                    bar_colors.append("#ef4444") # Red
+                    
+            fig_bt = go.Figure(data=[go.Bar(
+                x=strategies, 
+                y=returns,
+                text=[f"{r:+.2f}%" for r in returns],
+                textposition='auto',
+                marker_color=bar_colors
+            )])
+            
+            fig_bt.update_layout(
+                title="지표별 시뮬레이션 누적 수익률 비교",
+                template="plotly_dark",
+                paper_bgcolor='#0d0f14',
+                plot_bgcolor='#0d0f14',
+                yaxis_title="누적 수익률 (%)",
+                margin=dict(t=50, b=40, l=40, r=40),
+                height=400
+            )
+            
+            st.plotly_chart(fig_bt, use_container_width=True)
