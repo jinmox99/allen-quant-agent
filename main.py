@@ -319,11 +319,12 @@ if st.button("🚀 백테스트 실행하기", type="primary", use_container_wid
             st.error("백테스트를 위한 데이터가 부족합니다.")
         else:
             # Separate Buy & Hold from the active trading strategies
-            bh_return = backtest_results.pop("단순 보유 (Buy & Hold)", 0)
+            bh_data = backtest_results.pop("단순 보유 (Buy & Hold)", {"return": 0})
+            bh_return = bh_data.get("return", 0)
             
             # Find the best strategy among active ones
-            best_strategy = max(backtest_results, key=backtest_results.get)
-            best_return = backtest_results[best_strategy]
+            best_strategy = max(backtest_results, key=lambda k: backtest_results[k]["return"])
+            best_return = backtest_results[best_strategy]["return"]
             
             diff = best_return - bh_return
             diff_text = f"{diff:+.2f}%p {'우세' if diff > 0 else '열세'}"
@@ -332,7 +333,7 @@ if st.button("🚀 백테스트 실행하기", type="primary", use_container_wid
             
             # Prepare data for Plotly Bar Chart (Only active strategies)
             strategies = list(backtest_results.keys())
-            returns = list(backtest_results.values())
+            returns = [backtest_results[s]["return"] for s in strategies]
             
             # Colors: Green for positive, Red for negative, highlight Best, Purple for Smart Strategies
             bar_colors = []
@@ -377,3 +378,78 @@ if st.button("🚀 백테스트 실행하기", type="primary", use_container_wid
             )
             
             st.plotly_chart(fig_bt, use_container_width=True)
+            
+            # ----------------- TRADE HISTORY CHART -----------------
+            st.markdown("---")
+            st.markdown("### 🔍 전략별 상세 매매 내역 보기")
+            
+            # Add Buy & Hold back for inspection
+            backtest_results["단순 보유 (Buy & Hold)"] = bh_data
+            all_strats = list(backtest_results.keys())
+            
+            # Default to the best strategy
+            selected_strat = st.selectbox("타점을 확인하고 싶은 전략을 선택하세요:", all_strats, index=all_strats.index(best_strategy) if best_strategy in all_strats else 0)
+            
+            strat_data = backtest_results[selected_strat]
+            st.info(f"**📖 전략 설명:** {strat_data.get('desc', '설명이 없습니다.')}")
+            
+            trades = strat_data.get("trades", [])
+            
+            fig_trades = go.Figure()
+            
+            # Add Price line
+            fig_trades.add_trace(go.Scatter(
+                x=df['Date'], y=df['Close'],
+                mode='lines',
+                name='종가(Close)',
+                line=dict(color='#94a3b8', width=2)
+            ))
+            
+            # Add Buy markers
+            buys = [t for t in trades if t['Action'] == 'BUY']
+            if buys:
+                fig_trades.add_trace(go.Scatter(
+                    x=[t['Date'] for t in buys],
+                    y=[t['Price'] for t in buys],
+                    mode='markers',
+                    name='매수 (BUY)',
+                    marker=dict(symbol='triangle-up', size=14, color='#10b981', line=dict(width=1, color='white')),
+                    text=[f"{t.get('Reason', '조건 만족')}<br>단가: {t['Price']:.2f}" for t in buys],
+                    hoverinfo="x+text"
+                ))
+                
+            # Add Sell markers
+            sells = [t for t in trades if t['Action'] == 'SELL']
+            if sells:
+                fig_trades.add_trace(go.Scatter(
+                    x=[t['Date'] for t in sells],
+                    y=[t['Price'] for t in sells],
+                    mode='markers',
+                    name='매도 (SELL)',
+                    marker=dict(symbol='triangle-down', size=14, color='#ef4444', line=dict(width=1, color='white')),
+                    text=[f"{t.get('Reason', '조건 만족')}<br>단가: {t['Price']:.2f}" for t in sells],
+                    hoverinfo="x+text"
+                ))
+                
+            fig_trades.update_layout(
+                title=f"{selected_strat} - 과거 매매 타점 시각화",
+                template="plotly_dark",
+                paper_bgcolor='#0d0f14',
+                plot_bgcolor='#0d0f14',
+                yaxis_title="주가",
+                xaxis_title="날짜",
+                margin=dict(t=50, b=40, l=40, r=40),
+                height=450,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            
+            st.plotly_chart(fig_trades, use_container_width=True)
+            
+            if trades:
+                with st.expander("매매 내역 상세 표 (Table)"):
+                    trades_df = pd.DataFrame(trades)
+                    if not trades_df.empty:
+                        trades_df = trades_df[['Date', 'Action', 'Price', 'Shares', 'Reason']]
+                        st.dataframe(trades_df, use_container_width=True)
+            else:
+                st.write("해당 기간 동안 발생한 매매 내역이 없습니다.")
