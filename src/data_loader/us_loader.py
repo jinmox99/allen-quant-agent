@@ -52,12 +52,11 @@ def get_us_stock_info(ticker: str) -> dict:
     """
     Returns metadata and current price information for a US asset.
     """
-    asset_name = US_ASSETS.get(ticker, "Unknown US Asset")
-    
     try:
         yt = yf.Ticker(ticker)
         # Fast extraction of current price and basic info
         info = yt.info
+        asset_name = US_ASSETS.get(ticker, info.get('longName') or info.get('shortName') or ticker)
         current_price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('navPrice')
         
         # Fallback if info is empty or slow

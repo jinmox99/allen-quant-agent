@@ -14,6 +14,28 @@ def get_kr_assets():
     """Returns the dictionary of predefined Korean assets."""
     return KR_ASSETS
 
+# Global cache for KRX stock listing to avoid fetching multiple times
+_KRX_LISTING_CACHE = None
+
+def get_kr_stock_name(ticker: str) -> str:
+    """Gets the Korean stock name dynamically from FDR."""
+    global _KRX_LISTING_CACHE
+    if _KRX_LISTING_CACHE is None:
+        try:
+            _KRX_LISTING_CACHE = fdr.StockListing('KRX')
+        except Exception:
+            return f"한국 종목 ({ticker})"
+            
+    try:
+        # StockListing returns a DataFrame with 'Code' and 'Name'
+        matches = _KRX_LISTING_CACHE[_KRX_LISTING_CACHE['Code'] == ticker]
+        if not matches.empty:
+            return matches.iloc[0]['Name']
+    except Exception:
+        pass
+        
+    return f"한국 종목 ({ticker})"
+
 def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """
     Fetches historical OHLCV data for a Korean ETF/ETN ticker.
@@ -51,7 +73,7 @@ def get_kr_stock_info(ticker: str) -> dict:
     """
     Returns metadata and current price information for a Korean asset.
     """
-    asset_name = KR_ASSETS.get(ticker, "Unknown Korean Asset")
+    asset_name = KR_ASSETS.get(ticker, get_kr_stock_name(ticker))
     
     # Fetch recent price to extract current close and change
     end_date = datetime.now().strftime('%Y-%m-%d')
