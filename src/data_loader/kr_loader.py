@@ -42,6 +42,9 @@ def get_kr_stock_name(ticker: str) -> str:
         
     return ticker
 
+import streamlit as st
+
+@st.cache_data(ttl=3600)
 def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """
     Fetches historical OHLCV data for a Korean ETF/ETN/Stock ticker using yfinance.
@@ -85,6 +88,7 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None)
         # Return an empty DataFrame with standard columns as fallback
         return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Change'])
 
+@st.cache_data(ttl=3600)
 def get_kr_stock_info(ticker: str) -> dict:
     """
     Returns metadata and current price information for a Korean asset.
