@@ -53,25 +53,7 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     else:
         signals["macd"] = {"status": "중립 (신호 혼재)", "message": "MACD 뚜렷한 모멘텀을 보이지 않고 있습니다.", "color": "#64748b"}
 
-    # 3. RSI 분석
-    if rsi >= 70:
-        signals["rsi"] = {"status": "과매수 (과열)", "message": f"RSI가 {rsi:.1f}로 과열 상태입니다. 단기 조정(하락)에 주의해야 합니다.", "color": "#ef4444"}
-    elif rsi <= 30:
-        signals["rsi"] = {"status": "과매도 (바닥권)", "message": f"RSI가 {rsi:.1f}로 심한 매도세가 있었습니다. 기술적 반등이 기대되는 구간입니다.", "color": "#a855f7"}
-    else:
-        signals["rsi"] = {"status": "안정권 (중립)", "message": f"RSI가 {rsi:.1f}로 과열이나 과매도 없이 안정적인 흐름을 보이고 있습니다.", "color": "#64748b"}
 
-    # 4. Bollinger Bands (볼린저 밴드) 분석
-    if low <= bb_lower or close <= bb_lower * 1.01:
-        signals["bb"] = {"status": "하단 이탈 (투매 구간)", "message": "주가(꼬리 포함)가 밴드 하단을 찍거나 뚫었습니다. 강한 반등 저항선 역할을 기대할 수 있습니다.", "color": "#a855f7"}
-    elif high >= bb_upper or close >= bb_upper * 0.99:
-        signals["bb"] = {"status": "상단 돌파 (단기 고점)", "message": "주가가 밴드 상단에 도달했습니다. 차익 실현 매물이 나올 확률이 높습니다.", "color": "#f59e0b"}
-    else:
-        bb_width = (bb_upper - bb_lower) / latest['BB_Mid'] * 100
-        if bb_width < 5:
-            signals["bb"] = {"status": "밴드 수축 (응축기)", "message": "밴드 폭이 매우 좁아 변동성이 축소된 상태로, 조만간 큰 방향성 분출이 예상됩니다.", "color": "#38bdf8"}
-        else:
-            signals["bb"] = {"status": "정상 변동성 구간", "message": "주가가 밴드 안에서 정상적인 변동성을 보이며 움직이고 있습니다.", "color": "#64748b"}
 
     # 5. Quant Momentum (퀀트 모멘텀)
     if close < sma20 and macd < macd_signal:
