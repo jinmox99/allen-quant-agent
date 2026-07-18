@@ -18,8 +18,29 @@ def get_kr_assets():
 _KRX_LISTING_CACHE = None
 
 def get_kr_stock_name(ticker: str) -> str:
-    """Returns a simple formatted string to completely avoid external network hangs."""
-    return f"한국 종목 ({ticker})"
+    """Returns stock name via Yahoo Search API to avoid KRX IP block and .info hangs."""
+    import requests
+    try:
+        # Try KOSPI search
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}.KS"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get(url, headers=headers, timeout=2)
+        if res.status_code == 200:
+            data = res.json()
+            if 'quotes' in data and len(data['quotes']) > 0:
+                return data['quotes'][0].get('shortname') or data['quotes'][0].get('longname') or ticker
+                
+        # Try KOSDAQ search
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}.KQ"
+        res = requests.get(url, headers=headers, timeout=2)
+        if res.status_code == 200:
+            data = res.json()
+            if 'quotes' in data and len(data['quotes']) > 0:
+                return data['quotes'][0].get('shortname') or data['quotes'][0].get('longname') or ticker
+    except Exception:
+        pass
+        
+    return ticker
 
 def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """

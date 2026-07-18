@@ -53,7 +53,25 @@ def get_us_stock_info(ticker: str) -> dict:
     Returns metadata and current price information for a US asset.
     """
     try:
-        asset_name = US_ASSETS.get(ticker, f"미국 종목 ({ticker})")
+        # Use Yahoo Search API to get name safely without .info hanging
+        import requests
+        asset_name = ticker
+        if ticker in US_ASSETS:
+            asset_name = US_ASSETS[ticker]
+        else:
+            try:
+                url = f"https://query2.finance.yahoo.com/v1/finance/search?q={ticker}"
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                res = requests.get(url, headers=headers, timeout=2)
+                if res.status_code == 200:
+                    data = res.json()
+                    if 'quotes' in data and len(data['quotes']) > 0:
+                        for q in data['quotes']:
+                            if q.get('symbol', '').upper() == ticker.upper():
+                                asset_name = q.get('shortname') or q.get('longname') or ticker
+                                break
+            except Exception:
+                pass
         
         # Fallback to fetching recent data directly to avoid .info hangs
         end_date = datetime.now().strftime('%Y-%m-%d')
