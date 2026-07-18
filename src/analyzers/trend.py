@@ -104,9 +104,9 @@ def analyze_trend(df: pd.DataFrame) -> dict:
 
     # 7. BB Squeeze
     bb_width_prev = prev['BB_Width'] if 'BB_Width' in prev else 100
-    if bb_width_prev < 5.0 and close > bb_upper:
+    if bb_width_prev < 10.0 and close > bb_upper:
         signals["bb_squeeze"] = {"status": "상단 돌파 (매수)", "message": "에너지를 꽉 응축한 스퀴즈 상태에서 상단을 뚫고 대세 상승을 시작했습니다.", "color": "#10b981"}
-    elif bb_width_prev < 5.0:
+    elif bb_width_prev < 10.0:
         signals["bb_squeeze"] = {"status": "스퀴즈 (응축기)", "message": "밴드 폭이 매우 좁아 곧 큰 변동성이 터질 준비를 하고 있습니다.", "color": "#38bdf8"}
     else:
         signals["bb_squeeze"] = {"status": "정상 변동성", "message": "일반적인 밴드 변동성 구간입니다.", "color": "#64748b"}
@@ -121,12 +121,17 @@ def analyze_trend(df: pd.DataFrame) -> dict:
 
     import numpy as np
     # 9. Dual Momentum
-    c1 = latest['Close_1M_ago'] if 'Close_1M_ago' in latest and not np.isnan(latest['Close_1M_ago']) else close
-    c3 = latest['Close_3M_ago'] if 'Close_3M_ago' in latest and not np.isnan(latest['Close_3M_ago']) else close
-    c6 = latest['Close_6M_ago'] if 'Close_6M_ago' in latest and not np.isnan(latest['Close_6M_ago']) else close
-    if close > c1 and close > c3 and close > c6:
+    c1 = latest['Close_1M_ago'] if 'Close_1M_ago' in latest and not np.isnan(latest['Close_1M_ago']) else 0
+    c3 = latest['Close_3M_ago'] if 'Close_3M_ago' in latest and not np.isnan(latest['Close_3M_ago']) else 0
+    c6 = latest['Close_6M_ago'] if 'Close_6M_ago' in latest and not np.isnan(latest['Close_6M_ago']) else 0
+    
+    cond1 = (close > c1) if c1 > 0 else True
+    cond3 = (close > c3) if c3 > 0 else True
+    cond6 = (close > c6) if c6 > 0 else True
+
+    if cond1 and cond3 and cond6:
         signals["dual_momentum"] = {"status": "트리플 크라운 (홀딩)", "message": "1, 3, 6개월 단기/중기/장기 모멘텀이 모두 살아있는 강력한 상승장입니다.", "color": "#10b981"}
-    elif close < c1 and close < c3:
+    elif (not cond1) and (not cond3):
         signals["dual_momentum"] = {"status": "모멘텀 붕괴 (현금화)", "message": "단기와 중기 모멘텀이 모두 꺾였습니다. 리스크 관리를 위해 전량 현금화가 필요합니다.", "color": "#ef4444"}
     else:
         signals["dual_momentum"] = {"status": "혼조세", "message": "타임프레임별 모멘텀이 엇갈리고 있습니다.", "color": "#f59e0b"}

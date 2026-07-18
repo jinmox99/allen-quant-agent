@@ -221,8 +221,8 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
             sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
             date_str = dates.iloc[i]
             
-            # 매수: 밴드 폭이 5% 미만이었다가 뚫고 올라갈 때
-            if bb_width_prev < 5.0 and close > bb_upper and cash > 10:
+            # 매수: 밴드 폭이 10% 미만이었다가 뚫고 올라갈 때
+            if bb_width_prev < 10.0 and close > bb_upper and cash > 10:
                 buy_shares = cash / close
                 shares += buy_shares
                 cash = 0.0
@@ -272,19 +272,23 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         trades = []
         for i in range(len(df)):
             close = float(df['Close'].iloc[i])
-            c1 = float(df['Close_1M_ago'].iloc[i]) if 'Close_1M_ago' in df.columns and not np.isnan(df['Close_1M_ago'].iloc[i]) else close
-            c3 = float(df['Close_3M_ago'].iloc[i]) if 'Close_3M_ago' in df.columns and not np.isnan(df['Close_3M_ago'].iloc[i]) else close
-            c6 = float(df['Close_6M_ago'].iloc[i]) if 'Close_6M_ago' in df.columns and not np.isnan(df['Close_6M_ago'].iloc[i]) else close
+            c1 = float(df['Close_1M_ago'].iloc[i]) if 'Close_1M_ago' in df.columns and not np.isnan(df['Close_1M_ago'].iloc[i]) else 0
+            c3 = float(df['Close_3M_ago'].iloc[i]) if 'Close_3M_ago' in df.columns and not np.isnan(df['Close_3M_ago'].iloc[i]) else 0
+            c6 = float(df['Close_6M_ago'].iloc[i]) if 'Close_6M_ago' in df.columns and not np.isnan(df['Close_6M_ago'].iloc[i]) else 0
             date_str = dates.iloc[i]
             
+            cond1 = (close > c1) if c1 > 0 else True
+            cond3 = (close > c3) if c3 > 0 else True
+            cond6 = (close > c6) if c6 > 0 else True
+            
             # 매수: 1, 3, 6개월 전보다 현재 주가가 모두 높을 때
-            if close > c1 and close > c3 and close > c6 and cash > 10:
+            if cond1 and cond3 and cond6 and cash > 10:
                 buy_shares = cash / close
                 shares += buy_shares
                 cash = 0.0
                 trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "듀얼 모멘텀 (모든 추세 상승)"})
             # 매도: 1개월, 3개월 모멘텀이 모두 마이너스로 돌아서면
-            elif close < c1 and close < c3 and shares > 0:
+            elif (not cond1) and (not cond3) and shares > 0:
                 sell_shares = shares
                 cash += shares * close
                 shares = 0.0
