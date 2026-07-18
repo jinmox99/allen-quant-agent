@@ -209,6 +209,90 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
 
+    def simulate_bb_squeeze():
+        desc = "변동성이 극도로 줄어든 스퀴즈(Squeeze) 구간에서 상단 밴드를 강하게 뚫을 때 추격 매수하고, 추세선(20일선)이 깨지면 매도하는 돌파 전략입니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        for i in range(1, len(df)):
+            close = float(df['Close'].iloc[i])
+            bb_upper = float(df['BB_Upper'].iloc[i])
+            bb_width_prev = float(df['BB_Width'].iloc[i-1]) if 'BB_Width' in df.columns else 100
+            sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
+            date_str = dates.iloc[i]
+            
+            # 매수: 밴드 폭이 5% 미만이었다가 뚫고 올라갈 때
+            if bb_width_prev < 5.0 and close > bb_upper and cash > 10:
+                buy_shares = cash / close
+                shares += buy_shares
+                cash = 0.0
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "스퀴즈 돌파 (밴드 상단 돌파)"})
+            # 매도: 종가가 20일선 밑으로 깨질 때
+            elif close < sma20 and shares > 0:
+                sell_shares = shares
+                cash += shares * close
+                shares = 0.0
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "추세 이탈 (20일선 하향 돌파)"})
+                
+        val = cash + (shares * end_price)
+        return {"return": ((val - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+
+    def simulate_rsi_div():
+        desc = "주가는 이전 최저점을 깼지만(신저가), 보조지표 RSI는 이전 최저점보다 높아지는 '다이버전스' 현상을 포착해 폭락장의 찐 바닥을 잡는 전략입니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        for i in range(1, len(df)):
+            close = float(df['Close'].iloc[i])
+            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
+            min_close_prev = float(df['Min_Close_20'].iloc[i-1]) if 'Min_Close_20' in df.columns and not np.isnan(df['Min_Close_20'].iloc[i-1]) else 0
+            min_rsi_prev = float(df['Min_RSI_20'].iloc[i-1]) if 'Min_RSI_20' in df.columns and not np.isnan(df['Min_RSI_20'].iloc[i-1]) else 0
+            date_str = dates.iloc[i]
+            
+            # 매수: 주가는 신저가(20일 최저점)를 깼는데 RSI는 20일 최저점보다 높을 때 (그리고 RSI < 40)
+            if close < min_close_prev and rsi > min_rsi_prev and rsi < 40 and cash > 10:
+                buy_shares = cash / close
+                shares += buy_shares
+                cash = 0.0
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "RSI 다이버전스 (바닥 매수)"})
+            # 매도: RSI 과열
+            elif rsi > 70 and shares > 0:
+                sell_shares = shares
+                cash += shares * close
+                shares = 0.0
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "과열 익절 (RSI 70 이상)"})
+                
+        val = cash + (shares * end_price)
+        return {"return": ((val - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+
+    def simulate_dual_momentum():
+        desc = "1개월, 3개월, 6개월 전 주가와 비교하여 모든 기간에서 주가가 상승했을 때만 100% 주식을 보유하고, 단기 추세가 꺾이면 전량 현금화하는 극강의 방어형 전략입니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        for i in range(len(df)):
+            close = float(df['Close'].iloc[i])
+            c1 = float(df['Close_1M_ago'].iloc[i]) if 'Close_1M_ago' in df.columns and not np.isnan(df['Close_1M_ago'].iloc[i]) else close
+            c3 = float(df['Close_3M_ago'].iloc[i]) if 'Close_3M_ago' in df.columns and not np.isnan(df['Close_3M_ago'].iloc[i]) else close
+            c6 = float(df['Close_6M_ago'].iloc[i]) if 'Close_6M_ago' in df.columns and not np.isnan(df['Close_6M_ago'].iloc[i]) else close
+            date_str = dates.iloc[i]
+            
+            # 매수: 1, 3, 6개월 전보다 현재 주가가 모두 높을 때
+            if close > c1 and close > c3 and close > c6 and cash > 10:
+                buy_shares = cash / close
+                shares += buy_shares
+                cash = 0.0
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "듀얼 모멘텀 (모든 추세 상승)"})
+            # 매도: 1개월, 3개월 모멘텀이 모두 마이너스로 돌아서면
+            elif close < c1 and close < c3 and shares > 0:
+                sell_shares = shares
+                cash += shares * close
+                shares = 0.0
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "단기/중기 추세 꺾임 (현금화)"})
+                
+        val = cash + (shares * end_price)
+        return {"return": ((val - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+
     return {
         "단순 보유 (Buy & Hold)": {"return": bh_return, "trades": bh_trades, "desc": "가장 기본이 되는 벤치마크. 첫날에 현금을 전액 주식에 몰빵한 뒤, 끝까지 가만히 들고 있었을 경우의 수익률입니다."},
         "이동평균선 (SMA)": simulate(sma_sig, "주가가 20일선 위로 올라타면 전액 매수, 20일선 밑으로 깨고 내려가면 전액 매도합니다. 대세 추세를 따라갈 때 유리합니다."),
@@ -216,5 +300,8 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         "RSI": simulate(rsi_sig, "RSI가 30 이하(과매도)로 떨어지면 싼 값이라 판단해 전액 매수, 70 이상(과매수)으로 올라가면 비싸다 판단해 전액 매도합니다."),
         "볼린저 밴드 (BB)": simulate(bb_sig, "주가가 볼린저 밴드 하단에 닿거나 뚫고 내려가면 전액 매수, 밴드 상단에 닿거나 뚫고 올라가면 전액 매도합니다."),
         "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum(),
-        "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross()
+        "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross(),
+        "💎 🌊 BB 스퀴즈 돌파": simulate_bb_squeeze(),
+        "💎 🎣 RSI 다이버전스": simulate_rsi_div(),
+        "💎 🛡️ 듀얼 모멘텀": simulate_dual_momentum()
     }

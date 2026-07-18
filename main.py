@@ -216,12 +216,20 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("### 💎 초과 수익 달성형 (알파) 지표 상태")
 st.markdown("<p style='color:#94a3b8; font-size:14px;'>Buy & Hold 벤치마크를 넘어서기 위해 설계된 공격적 추세 추종 전략들의 현재 시그널입니다.</p>", unsafe_allow_html=True)
 
-col_a1, col_a2 = st.columns(2)
+# 활성화된 퀀트 모멘텀 전략 리스트 (원하는 전략을 쉽게 추가/삭제 가능)
+ACTIVE_STRATEGIES = [
+    ("퀀트 모멘텀", "💎", "quant_momentum"),
+    ("EMA 5/20 교차", "⚡", "ema_cross"),
+    ("BB 스퀴즈 돌파", "🌊", "bb_squeeze"),
+    ("RSI 다이버전스", "🎣", "rsi_div"),
+    ("듀얼 모멘텀", "🛡️", "dual_momentum")
+]
 
-with col_a1:
-    st.markdown(render_status_panel("퀀트 모멘텀", "💎", trend_result.get('quant_momentum', {"status": "오류", "color": "#ef4444", "message": ""})), unsafe_allow_html=True)
-with col_a2:
-    st.markdown(render_status_panel("EMA 5/20 교차", "⚡", trend_result.get('ema_cross', {"status": "오류", "color": "#ef4444", "message": ""})), unsafe_allow_html=True)
+# 한 줄에 2개씩 패널 배치
+cols = st.columns(2)
+for i, (name, icon, key) in enumerate(ACTIVE_STRATEGIES):
+    with cols[i % 2]:
+        st.markdown(render_status_panel(name, icon, trend_result.get(key, {"status": "오류", "color": "#ef4444", "message": ""})), unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 

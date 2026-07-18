@@ -13,7 +13,10 @@ def analyze_trend(df: pd.DataFrame) -> dict:
             "rsi": default_signal,
             "bb": default_signal,
             "quant_momentum": default_signal,
-            "ema_cross": default_signal
+            "ema_cross": default_signal,
+            "bb_squeeze": default_signal,
+            "rsi_div": default_signal,
+            "dual_momentum": default_signal
         }
         
     latest = df.iloc[-1]
@@ -98,5 +101,34 @@ def analyze_trend(df: pd.DataFrame) -> dict:
         signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e"}
     else:
         signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b"}
+
+    # 7. BB Squeeze
+    bb_width_prev = prev['BB_Width'] if 'BB_Width' in prev else 100
+    if bb_width_prev < 5.0 and close > bb_upper:
+        signals["bb_squeeze"] = {"status": "상단 돌파 (매수)", "message": "에너지를 꽉 응축한 스퀴즈 상태에서 상단을 뚫고 대세 상승을 시작했습니다.", "color": "#10b981"}
+    elif bb_width_prev < 5.0:
+        signals["bb_squeeze"] = {"status": "스퀴즈 (응축기)", "message": "밴드 폭이 매우 좁아 곧 큰 변동성이 터질 준비를 하고 있습니다.", "color": "#38bdf8"}
+    else:
+        signals["bb_squeeze"] = {"status": "정상 변동성", "message": "일반적인 밴드 변동성 구간입니다.", "color": "#64748b"}
+
+    # 8. RSI Divergence
+    min_rsi_prev = prev['Min_RSI_20'] if 'Min_RSI_20' in prev else 50
+    min_close_prev = prev['Min_Close_20'] if 'Min_Close_20' in prev else close
+    if close < min_close_prev and rsi > min_rsi_prev and rsi < 40:
+        signals["rsi_div"] = {"status": "다이버전스 포착 (바닥 줍기)", "message": "주가는 신저가를 갱신했지만 RSI는 저점을 높이는 다이버전스가 발생했습니다. 강력한 바닥 매수 타이밍입니다.", "color": "#a855f7"}
+    else:
+        signals["rsi_div"] = {"status": "다이버전스 없음", "message": "특이한 RSI 다이버전스 패턴이 보이지 않습니다.", "color": "#64748b"}
+
+    import numpy as np
+    # 9. Dual Momentum
+    c1 = latest['Close_1M_ago'] if 'Close_1M_ago' in latest and not np.isnan(latest['Close_1M_ago']) else close
+    c3 = latest['Close_3M_ago'] if 'Close_3M_ago' in latest and not np.isnan(latest['Close_3M_ago']) else close
+    c6 = latest['Close_6M_ago'] if 'Close_6M_ago' in latest and not np.isnan(latest['Close_6M_ago']) else close
+    if close > c1 and close > c3 and close > c6:
+        signals["dual_momentum"] = {"status": "트리플 크라운 (홀딩)", "message": "1, 3, 6개월 단기/중기/장기 모멘텀이 모두 살아있는 강력한 상승장입니다.", "color": "#10b981"}
+    elif close < c1 and close < c3:
+        signals["dual_momentum"] = {"status": "모멘텀 붕괴 (현금화)", "message": "단기와 중기 모멘텀이 모두 꺾였습니다. 리스크 관리를 위해 전량 현금화가 필요합니다.", "color": "#ef4444"}
+    else:
+        signals["dual_momentum"] = {"status": "혼조세", "message": "타임프레임별 모멘텀이 엇갈리고 있습니다.", "color": "#f59e0b"}
 
     return signals

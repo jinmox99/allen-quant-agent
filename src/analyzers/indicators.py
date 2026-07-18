@@ -88,6 +88,19 @@ def add_all_indicators(df: pd.DataFrame, column: str = 'Close') -> pd.DataFrame:
         df_out['Donchian_High_20'] = df_out['High'].rolling(window=20).max().shift(1)
         df_out['Donchian_Low_10'] = df_out['Low'].rolling(window=10).min().shift(1)
         
+    # Bollinger Band Width (BB Squeeze)
+    df_out['BB_Width'] = (df_out['BB_Upper'] - df_out['BB_Lower']) / df_out['BB_Mid'] * 100
+    
+    # 20-Day Minimums (RSI Divergence)
+    df_out['Min_Close_20'] = df_out['Close'].rolling(window=20).min()
+    df_out['Min_RSI_20'] = df_out['RSI'].rolling(window=20).min()
+    
+    # Historical Prices (Dual Momentum)
+    # Approx: 1M=21 days, 3M=63 days, 6M=126 days
+    df_out['Close_1M_ago'] = df_out['Close'].shift(21)
+    df_out['Close_3M_ago'] = df_out['Close'].shift(63)
+    df_out['Close_6M_ago'] = df_out['Close'].shift(126)
+        
     # Daily returns
     df_out['Daily_Return'] = df_out['Close'].pct_change()
     
