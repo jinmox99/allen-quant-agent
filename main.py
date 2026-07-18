@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import json
+import os
 
 # Load environment variables
 load_dotenv()
@@ -98,16 +100,18 @@ st.markdown("<h1 class='agent-title'>⚡ AI 기술적 추세 분석 대시보드
 st.markdown("<p style='color: #94a3b8; font-size: 16px; margin-top: -12px;'>한 종목에 대한 다중 지표(이동평균, MACD, RSI, 볼린저밴드)를 활용한 입체적 추세 진단 시스템</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# ----------------- SIDEBAR & INPUT -----------------
-with st.sidebar:
-    st.header("🔍 종목 검색")
-    market = st.selectbox("시장 (Market)", ["KR (한국)", "US (미국)"], index=0)
-    is_kr = market.startswith("KR")
-    
-    # 시장별 즐겨찾기 목록 구성
-    if is_kr:
-        FAVORITES = {
-            "🌟 직접 입력": "",
+# ----------------- FAVORITES MANAGER -----------------
+FAVORITES_FILE = "favorites.json"
+
+def load_favorites():
+    if os.path.exists(FAVORITES_FILE):
+        try:
+            with open(FAVORITES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {
+        "KR": {
             "삼성전자": "005930",
             "SK하이닉스": "000660",
             "현대차": "005380",
@@ -115,11 +119,8 @@ with st.sidebar:
             "NAVER": "035420",
             "에코프로비엠": "247540",
             "셀트리온": "068270"
-        }
-        default_index = 2 # SK하이닉스
-    else:
-        FAVORITES = {
-            "🌟 직접 입력": "",
+        },
+        "US": {
             "애플 (AAPL)": "AAPL",
             "테슬라 (TSLA)": "TSLA",
             "엔비디아 (NVDA)": "NVDA",
@@ -129,9 +130,26 @@ with st.sidebar:
             "메타 (META)": "META",
             "비트코인 (BTC-USD)": "BTC-USD"
         }
-        default_index = 1 # 애플
+    }
+
+def save_favorites(favs):
+    with open(FAVORITES_FILE, "w", encoding="utf-8") as f:
+        json.dump(favs, f, ensure_ascii=False, indent=2)
+
+user_favorites = load_favorites()
+
+# ----------------- SIDEBAR & INPUT -----------------
+with st.sidebar:
+    st.header("🔍 종목 검색")
+    market = st.selectbox("시장 (Market)", ["KR (한국)", "US (미국)"], index=0)
+    is_kr = market.startswith("KR")
+    market_key = "KR" if is_kr else "US"
     
-    fav_selection = st.selectbox("⭐ 즐겨찾기 종목", list(FAVORITES.keys()), index=default_index)
+    # 시장별 즐겨찾기 목록 구성
+    FAVORITES = {"🌟 직접 입력": ""}
+    FAVORITES.update(user_favorites[market_key])
+    
+    fav_selection = st.selectbox("⭐ 즐겨찾기 종목", list(FAVORITES.keys()), index=1 if len(FAVORITES) > 1 else 0)
     
     if fav_selection == "🌟 직접 입력":
         default_ticker = "000660" if is_kr else "AAPL"
@@ -186,6 +204,27 @@ with col_kp1:
         <div class='metric-sub' style='color: #64748b;'>{ticker_input} ({'KRX' if is_kr else 'US'})</div>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    
+    is_favorite = False
+    fav_key = None
+    for k, v in user_favorites[market_key].items():
+        if v == ticker_input:
+            is_favorite = True
+            fav_key = k
+            break
+            
+    if is_favorite:
+        if st.button("❌ 즐겨찾기 해제", use_container_width=True):
+            del user_favorites[market_key][fav_key]
+            save_favorites(user_favorites)
+            st.rerun()
+    else:
+        if st.button("⭐ 현재 종목 즐겨찾기 추가", use_container_width=True):
+            user_favorites[market_key][info['name']] = ticker_input
+            save_favorites(user_favorites)
+            st.rerun()
     
 with col_kp2:
     st.markdown(f"""
