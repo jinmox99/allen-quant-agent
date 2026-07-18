@@ -16,8 +16,29 @@ def get_us_assets():
 
 import streamlit as st
 
-@st.cache_data(ttl=300)
-def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+def get_us_cache_key() -> str:
+    import pytz
+    try:
+        tz = pytz.timezone('US/Eastern')
+        now = datetime.now(tz)
+        is_weekday = now.weekday() < 5
+        market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        is_market_active = is_weekday and (market_open <= now <= market_close)
+        
+        if is_market_active:
+            # Round to nearest 5 minutes
+            minute_round = (now.minute // 5) * 5
+            return f"active_{now.strftime('%Y-%m-%d')}_{now.hour:02d}_{minute_round:02d}"
+        else:
+            # Round to nearest hour
+            return f"closed_{now.strftime('%Y-%m-%d')}_{now.hour:02d}"
+    except Exception:
+        now = datetime.now()
+        return f"fallback_{now.strftime('%Y-%m-%d')}_{now.hour:02d}"
+
+@st.cache_data(ttl=3600)
+def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None, cache_key: str = "") -> pd.DataFrame:
     """
     Fetches historical OHLCV data for a US leveraged ETF ticker using yfinance.
     
@@ -25,6 +46,7 @@ def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None)
     - ticker: str (e.g. 'TQQQ')
     - start_date: str (YYYY-MM-DD)
     - end_date: str (YYYY-MM-DD)
+    - cache_key: str (Optional key for caching logic)
     
     Returns:
     - pd.DataFrame containing Date, Open, High, Low, Close, Volume, Adj Close
@@ -54,8 +76,8 @@ def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None)
         print(f"Error fetching US data for ticker {ticker}: {str(e)}")
         return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
 
-@st.cache_data(ttl=300)
-def get_us_stock_info(ticker: str) -> dict:
+@st.cache_data(ttl=3600)
+def get_us_stock_info(ticker: str, cache_key: str = "") -> dict:
     """
     Returns metadata and current price information for a US asset.
     """
@@ -80,10 +102,11 @@ def get_us_stock_info(ticker: str) -> dict:
             except Exception:
                 pass
         
-        # Fallback to fetching recent data directly to avoid .info hangs
+        # Fetch recent price to extract current close and change
         end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
-        df = get_us_stock_data(ticker, start_date, end_date)
+        start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+        
+        df = get_us_stock_data(ticker, start_date, end_date, cache_key=cache_key)
         
         if not df.empty:
             current_price = float(df.iloc[-1]['Close'])

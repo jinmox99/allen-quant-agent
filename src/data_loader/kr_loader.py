@@ -44,8 +44,29 @@ def get_kr_stock_name(ticker: str) -> str:
 
 import streamlit as st
 
-@st.cache_data(ttl=300)
-def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+def get_krx_cache_key() -> str:
+    import pytz
+    try:
+        tz = pytz.timezone('Asia/Seoul')
+        now = datetime.now(tz)
+        is_weekday = now.weekday() < 5
+        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
+        is_market_active = is_weekday and (market_open <= now <= market_close)
+        
+        if is_market_active:
+            # Round to nearest 5 minutes
+            minute_round = (now.minute // 5) * 5
+            return f"active_{now.strftime('%Y-%m-%d')}_{now.hour:02d}_{minute_round:02d}"
+        else:
+            # Round to nearest hour
+            return f"closed_{now.strftime('%Y-%m-%d')}_{now.hour:02d}"
+    except Exception:
+        now = datetime.now()
+        return f"fallback_{now.strftime('%Y-%m-%d')}_{now.hour:02d}"
+
+@st.cache_data(ttl=3600)
+def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None, cache_key: str = "") -> pd.DataFrame:
     """
     Fetches historical OHLCV data for a Korean ETF/ETN/Stock ticker using yfinance.
     (Bypasses Naver Finance / KRX IP blocking on cloud servers)
@@ -88,8 +109,8 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None)
         # Return an empty DataFrame with standard columns as fallback
         return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Change'])
 
-@st.cache_data(ttl=300)
-def get_kr_stock_info(ticker: str) -> dict:
+@st.cache_data(ttl=3600)
+def get_kr_stock_info(ticker: str, cache_key: str = "") -> dict:
     """
     Returns metadata and current price information for a Korean asset.
     """
@@ -99,7 +120,7 @@ def get_kr_stock_info(ticker: str) -> dict:
     end_date = datetime.now().strftime('%Y-%m-%d')
     start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
     
-    df = get_kr_stock_data(ticker, start_date, end_date)
+    df = get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
     
     current_price = 0.0
     daily_change = 0.0

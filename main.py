@@ -11,8 +11,8 @@ import os
 load_dotenv()
 
 # Import internal modules
-from src.data_loader import get_kr_stock_data, get_kr_stock_info
-from src.data_loader import get_us_stock_data, get_us_stock_info
+from src.data_loader import get_kr_stock_data, get_kr_stock_info, get_krx_cache_key
+from src.data_loader import get_us_stock_data, get_us_stock_info, get_us_cache_key
 from src.analyzers.indicators import add_all_indicators
 from src.analyzers.trend import analyze_trend
 from src.backtester.simple import run_indicator_backtests
@@ -174,13 +174,15 @@ with st.spinner(f"'{ticker_input}' 종목 데이터 및 기술적 지표 계산 
     fetch_start_date = (datetime.now() - timedelta(days=days_to_fetch + 250)).strftime('%Y-%m-%d')
     
     if is_kr:
-        info = get_kr_stock_info(ticker_input)
-        df = get_kr_stock_data(ticker_input, start_date=fetch_start_date)
+        cache_key = get_krx_cache_key()
+        info = get_kr_stock_info(ticker_input, cache_key=cache_key)
+        df = get_kr_stock_data(ticker_input, start_date=fetch_start_date, cache_key=cache_key)
         price_unit = "원"
         price_format = f"{info['current_price']:,.0f}"
     else:
-        info = get_us_stock_info(ticker_input)
-        df = get_us_stock_data(ticker_input, start_date=fetch_start_date)
+        cache_key = get_us_cache_key()
+        info = get_us_stock_info(ticker_input, cache_key=cache_key)
+        df = get_us_stock_data(ticker_input, start_date=fetch_start_date, cache_key=cache_key)
         price_unit = "$"
         price_format = f"{info['current_price']:,.2f}"
 
