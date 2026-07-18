@@ -340,21 +340,24 @@ if st.session_state.get('run_bt_context') == f"{ticker_input}_{selected_period}"
             st.error("백테스트를 위한 데이터가 부족합니다.")
         else:
             # Separate Buy & Hold from the active trading strategies
-            bh_data = backtest_results.pop("단순 보유 (Buy & Hold)", {"return": 0})
+            bh_data = backtest_results.pop("단순 보유 (Buy & Hold)", {"return": 0, "mdd": 0})
             bh_return = bh_data.get("return", 0)
+            bh_mdd = bh_data.get("mdd", 0)
             
             # Find the best strategy among active ones
             best_strategy = max(backtest_results, key=lambda k: backtest_results[k]["return"])
             best_return = backtest_results[best_strategy]["return"]
+            best_mdd = backtest_results[best_strategy].get("mdd", 0)
             
             diff = best_return - bh_return
             diff_text = f"{diff:+.2f}%p {'우세' if diff > 0 else '열세'}"
             
-            st.success(f"**최우수 전략 (Best Strategy): 👑 {best_strategy}** (+{best_return:.2f}%) &nbsp; | &nbsp; 단순 보유 벤치마크: {bh_return:+.2f}% ({diff_text})")
+            st.success(f"**최우수 전략 (Best Strategy): 👑 {best_strategy}** (수익 {best_return:.2f}% | MDD {best_mdd:.1f}%) &nbsp; | &nbsp; 단순 보유 벤치마크: {bh_return:+.2f}% (MDD {bh_mdd:.1f}%) &nbsp;👉&nbsp; **{diff_text}**")
             
             # Prepare data for Plotly Bar Chart (Only active strategies)
             strategies = list(backtest_results.keys())
             returns = [backtest_results[s]["return"] for s in strategies]
+            mdds = [backtest_results[s].get("mdd", 0) for s in strategies]
             
             # Colors: Green for positive, Red for negative, highlight Best, Purple for Smart Strategies
             bar_colors = []
@@ -371,7 +374,7 @@ if st.session_state.get('run_bt_context') == f"{ticker_input}_{selected_period}"
             fig_bt = go.Figure(data=[go.Bar(
                 x=strategies, 
                 y=returns,
-                text=[f"{r:+.2f}%" for r in returns],
+                text=[f"{r:+.2f}%<br>(MDD {m:.1f}%)" for r, m in zip(returns, mdds)],
                 textposition='auto',
                 marker_color=bar_colors,
                 name="전략 수익률"
@@ -382,7 +385,7 @@ if st.session_state.get('run_bt_context') == f"{ticker_input}_{selected_period}"
                 y=bh_return, 
                 line_dash="dash", 
                 line_color="#f59e0b", # Amber/Orange color for benchmark
-                annotation_text=f"단순 보유 (Buy & Hold) 벤치마크: {bh_return:+.2f}%", 
+                annotation_text=f"단순 보유 (Buy & Hold) 벤치마크: {bh_return:+.2f}% (MDD {bh_mdd:.1f}%)", 
                 annotation_position="top right",
                 annotation_font_color="#f59e0b"
             )

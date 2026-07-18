@@ -22,13 +22,25 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
 
     start_price = float(df['Close'].iloc[0])
     end_price = float(df['Close'].iloc[-1])
+
+    def calculate_mdd(history):
+        if not history: return 0.0
+        import numpy as np
+        arr = np.array(history)
+        peaks = np.maximum.accumulate(arr)
+        drawdowns = (peaks - arr) / peaks
+        return float(np.max(drawdowns) * 100)
+
     bh_return = ((end_price - start_price) / start_price) * 100
+    bh_history = (df['Close'] / start_price * initial_capital).tolist()
+    bh_mdd = calculate_mdd(bh_history)
     bh_trades = [{"Date": dates.iloc[0], "Action": "BUY", "Price": start_price, "Shares": initial_capital / start_price, "Reason": "첫날 전액 매수"}]
 
     def simulate(signals: pd.Series, desc: str) -> dict:
         cash = initial_capital
         shares = 0.0
         trades = []
+        history = []
         for i in range(len(df)):
             sig = signals.iloc[i]
             price = float(df['Close'].iloc[i])
@@ -42,10 +54,12 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
                 cash = shares * price
                 trades.append({"Date": date_str, "Action": "SELL", "Price": price, "Shares": shares, "Reason": "조건 만족: 전액 매도"})
                 shares = 0.0
+            history.append(cash + shares * price)
                 
         final_value = cash + (shares * end_price)
         return {
             "return": ((final_value - initial_capital) / initial_capital) * 100,
+            "mdd": calculate_mdd(history),
             "trades": trades,
             "desc": desc
         }
@@ -78,6 +92,7 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         desc = "Buy&Hold를 이기기 위한 알파 추구형 전략입니다. 100% 주식으로 시작하며 자잘한 하락에는 흔들리지 않고 보유합니다. 주가가 20일선 아래로 무너지고 동시에 MACD마저 데드크로스가 났을 때만 '진짜 폭락장'으로 간주하여 100% 현금화(전액 매도)로 대피합니다. 이후 둘 중 하나라도 회복되면 즉시 상승장에 100% 재탑승합니다."
         cash = 0.0
         shares = initial_capital / float(df['Close'].iloc[0])
+        history = [initial_capital]
         trades = [{"Date": dates.iloc[0], "Action": "BUY", "Price": float(df['Close'].iloc[0]), "Shares": shares, "Reason": "초기 100% 매수"}]
         
         for i in range(1, len(df)):
@@ -98,15 +113,17 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
                 shares = cash / close_p
                 trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "상승 추세 회복 (100% 재탑승)"})
                 cash = 0.0
+            history.append(cash + shares * close_p)
                 
         final_value = cash + (shares * end_price)
-        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
     def simulate_turtle_trading():
         desc = "리처드 데니스의 전설적인 '터틀 트레이딩' 추세 추종 전략입니다. 주가가 최근 20일간의 최고점(신고가)을 돌파하면 대세 상승의 시작으로 보고 전액 매수합니다. 반대로 주가가 최근 10일간의 최저점(신저가) 밑으로 깨지면 미련 없이 전액 매도(손절/익절)하여 빠져나옵니다."
         cash = initial_capital
         shares = 0.0
         trades = []
+        history = [initial_capital]
         
         for i in range(1, len(df)):
             close_p = float(df['Close'].iloc[i])
@@ -134,6 +151,7 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         cash = initial_capital
         shares = 0.0
         trades = []
+        history = [initial_capital]
         
         for i in range(1, len(df)):
             close_p = float(df['Close'].iloc[i])
@@ -154,15 +172,17 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
                 cash = shares * close_p
                 trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "EMA 5/20 데드크로스 (단기 하락)"})
                 shares = 0.0
+            history.append(cash + shares * close_p)
                 
         final_value = cash + (shares * end_price)
-        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
     def simulate_hybrid_momentum():
         desc = "애플과 하이닉스 같은 대형 우량주에 최적화된 복합 모멘텀(HYBRID) 전략입니다. 20일선 상향 돌파 시 보유 현금의 50%를 추세 매수하고, RSI 30 이하 폭락 시 남은 현금의 50%를 투매 줍기로 매수합니다. 매도는 RSI 70 이상 과열 시 절반(50%)만 익절하고, MACD 데드크로스 발생 시 상승 에너지가 끝났다고 보아 전량(100%) 매도(손절/익절)하여 도망칩니다."
         cash = initial_capital
         shares = 0.0
         trades = []
+        history = [initial_capital]
         
         for i in range(1, len(df)):
             close_p = float(df['Close'].iloc[i])
@@ -265,6 +285,7 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         cash = initial_capital
         shares = 0.0
         trades = []
+        history = []
         for i in range(len(df)):
             close = float(df['Close'].iloc[i])
             c1 = float(df['Close_1M_ago'].iloc[i]) if 'Close_1M_ago' in df.columns and not np.isnan(df['Close_1M_ago'].iloc[i]) else 0
@@ -288,12 +309,13 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
                 cash += shares * close
                 shares = 0.0
                 trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "단기/중기 추세 꺾임 (현금화)"})
+            history.append(cash + shares * close)
                 
         val = cash + (shares * end_price)
-        return {"return": ((val - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+        return {"return": ((val - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
     return {
-        "단순 보유 (Buy & Hold)": {"return": bh_return, "trades": bh_trades, "desc": "가장 기본이 되는 벤치마크. 첫날에 현금을 전액 주식에 몰빵한 뒤, 끝까지 가만히 들고 있었을 경우의 수익률입니다."},
+        "단순 보유 (Buy & Hold)": {"return": bh_return, "mdd": bh_mdd, "trades": bh_trades, "desc": "가장 기본이 되는 벤치마크. 첫날에 현금을 전액 주식에 몰빵한 뒤, 끝까지 가만히 들고 있었을 경우의 수익률입니다."},
         "MACD": simulate(macd_sig, "단기 추세선이 장기 추세선을 상향 돌파(골든크로스)하면 전액 매수, 하향 돌파(데드크로스)하면 전액 매도합니다."),
         "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum(),
         "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross(),
