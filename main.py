@@ -94,32 +94,30 @@ st.markdown("""
     }
     
     /* Star Button Customization */
-    div[data-testid="column"]:nth-child(1) {
+    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) {
         position: relative;
     }
-    div[data-testid="column"]:nth-child(1) div[data-testid="stVerticalBlock"] > div.element-container:nth-child(1) {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        z-index: 50;
-        width: auto;
-    }
-    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] > button {
+    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) button {
+        position: absolute !important;
+        top: 20px !important;
+        right: 20px !important;
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        font-size: 26px !important;
-        padding: 0 !important;
         color: #facc15 !important;
+        font-size: 28px !important;
+        padding: 0 !important;
+        width: auto !important;
         min-height: 0 !important;
         height: auto !important;
         line-height: 1 !important;
+        z-index: 999 !important;
     }
-    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] > button:hover {
+    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) button:hover {
         transform: scale(1.15);
         background: transparent !important;
     }
-    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] > button:focus {
+    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) button:focus {
         background: transparent !important;
         color: #facc15 !important;
     }
@@ -220,14 +218,6 @@ trend_result = analyze_trend(df)
 col_kp1, col_kp2, col_kp3, col_kp4 = st.columns(4)
 
 with col_kp1:
-    st.markdown(f"""
-    <div class='metric-card'>
-        <div class='metric-title'>분석 대상 종목</div>
-        <div class='metric-value' style='color: #818cf8; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{info['name']}</div>
-        <div class='metric-sub' style='color: #64748b;'>{ticker_input} ({'KRX' if is_kr else 'US'})</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
     is_favorite = False
     fav_key = None
     for k, v in user_favorites[market_key].items():
@@ -244,6 +234,14 @@ with col_kp1:
             user_favorites[market_key][info['name']] = ticker_input
         save_favorites(user_favorites)
         st.rerun()
+
+    st.markdown(f"""
+    <div class='metric-card' style='margin-top: -65px; position: relative; z-index: 1;'>
+        <div class='metric-title'>분석 대상 종목</div>
+        <div class='metric-value' style='color: #818cf8; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{info['name']}</div>
+        <div class='metric-sub' style='color: #64748b;'>{ticker_input} ({'KRX' if is_kr else 'US'})</div>
+    </div>
+    """, unsafe_allow_html=True)
     
 with col_kp2:
     st.markdown(f"""
