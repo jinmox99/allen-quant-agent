@@ -221,25 +221,23 @@ def render_status_panel(title, icon, signal, last_trade=None):
     if last_trade:
         action_color = "#10b981" if last_trade['action'] == '매수' else "#ef4444"
         change_color = "#10b981" if last_trade['pct_change'] >= 0 else "#ef4444"
-        trade_html = f"""
-        <div style='margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #cbd5e1;'>
-            <span style='color: #94a3b8;'>마지막 신호:</span> <strong style='color: {action_color}'>{last_trade['action']}</strong> ({last_trade['date']})
-            <span style='margin: 0 6px;'>|</span>
-            <span style='color: #94a3b8;'>이후 변동:</span> <strong style='color: {change_color}'>{last_trade['pct_change']:+.2f}%</strong>
-        </div>
-        """
+        trade_html = f"<div style='margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; color: #cbd5e1;'>" \
+                     f"<span style='color: #94a3b8;'>마지막 신호:</span> <strong style='color: {action_color}'>{last_trade['action']}</strong> ({last_trade['date']}) " \
+                     f"<span style='margin: 0 6px;'>|</span> " \
+                     f"<span style='color: #94a3b8;'>이후 변동:</span> <strong style='color: {change_color}'>{last_trade['pct_change']:+.2f}%</strong>" \
+                     f"</div>"
         
     return f"""
-    <div class='status-panel' style='background-color: {bg_color}; border-color: {signal['color']}; margin-top: 0px; margin-bottom: 16px; padding: 20px;'>
-        <div style='font-size: 32px;'>{icon}</div>
-        <div>
-            <div style='color: #94a3b8; font-size: 13px; font-weight: 600; margin-bottom: 2px;'>{title}</div>
-            <div style='color: {signal['color']}; font-size: 18px; font-weight: 800; margin-bottom: 4px;'>{signal['status']}</div>
-            <div style='color: #e2e8f0; font-size: 14px; line-height: 1.4;'>{signal['message']}</div>
-            {trade_html}
-        </div>
-    </div>
-    """
+<div class='status-panel' style='background-color: {bg_color}; border-color: {signal['color']}; margin-top: 0px; margin-bottom: 16px; padding: 20px;'>
+<div style='font-size: 32px;'>{icon}</div>
+<div>
+<div style='color: #94a3b8; font-size: 13px; font-weight: 600; margin-bottom: 2px;'>{title}</div>
+<div style='color: {signal['color']}; font-size: 18px; font-weight: 800; margin-bottom: 4px;'>{signal['status']}</div>
+<div style='color: #e2e8f0; font-size: 14px; line-height: 1.4;'>{signal['message']}</div>
+{trade_html}
+</div>
+</div>
+"""
 
 with col_s1:
     st.markdown(render_status_panel("이동평균선 (SMA)", "📊", trend_result['sma'], trade_info_map.get('sma')), unsafe_allow_html=True)
