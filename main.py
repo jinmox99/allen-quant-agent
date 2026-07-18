@@ -318,13 +318,19 @@ if st.button("🚀 백테스트 실행하기", type="primary", use_container_wid
         if not backtest_results:
             st.error("백테스트를 위한 데이터가 부족합니다.")
         else:
-            # Find the best strategy
+            # Separate Buy & Hold from the active trading strategies
+            bh_return = backtest_results.pop("단순 보유 (Buy & Hold)", 0)
+            
+            # Find the best strategy among active ones
             best_strategy = max(backtest_results, key=backtest_results.get)
             best_return = backtest_results[best_strategy]
             
-            st.success(f"**최우수 전략 (Best Strategy): 👑 {best_strategy}** (+{best_return:.2f}%)")
+            diff = best_return - bh_return
+            diff_text = f"{diff:+.2f}%p {'우세' if diff > 0 else '열세'}"
             
-            # Prepare data for Plotly Bar Chart
+            st.success(f"**최우수 전략 (Best Strategy): 👑 {best_strategy}** (+{best_return:.2f}%) &nbsp; | &nbsp; 단순 보유 벤치마크: {bh_return:+.2f}% ({diff_text})")
+            
+            # Prepare data for Plotly Bar Chart (Only active strategies)
             strategies = list(backtest_results.keys())
             returns = list(backtest_results.values())
             
@@ -343,17 +349,29 @@ if st.button("🚀 백테스트 실행하기", type="primary", use_container_wid
                 y=returns,
                 text=[f"{r:+.2f}%" for r in returns],
                 textposition='auto',
-                marker_color=bar_colors
+                marker_color=bar_colors,
+                name="전략 수익률"
             )])
             
+            # Add Buy & Hold as a benchmark horizontal line
+            fig_bt.add_hline(
+                y=bh_return, 
+                line_dash="dash", 
+                line_color="#f59e0b", # Amber/Orange color for benchmark
+                annotation_text=f"단순 보유 (Buy & Hold) 벤치마크: {bh_return:+.2f}%", 
+                annotation_position="top right",
+                annotation_font_color="#f59e0b"
+            )
+            
             fig_bt.update_layout(
-                title="지표별 시뮬레이션 누적 수익률 비교",
+                title="지표별 시뮬레이션 누적 수익률 비교 (vs 단순 보유)",
                 template="plotly_dark",
                 paper_bgcolor='#0d0f14',
                 plot_bgcolor='#0d0f14',
                 yaxis_title="누적 수익률 (%)",
                 margin=dict(t=50, b=40, l=40, r=40),
-                height=400
+                height=400,
+                showlegend=False
             )
             
             st.plotly_chart(fig_bt, use_container_width=True)
