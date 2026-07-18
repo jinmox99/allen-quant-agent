@@ -23,34 +23,38 @@ def get_kr_stock_name(ticker: str) -> str:
 
 def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """
-    Fetches historical OHLCV data for a Korean ETF/ETN ticker.
-    
-    Parameters:
-    - ticker: str (e.g. '441800')
-    - start_date: str (YYYY-MM-DD)
-    - end_date: str (YYYY-MM-DD)
-    
-    Returns:
-    - pd.DataFrame containing Date, Open, High, Low, Close, Volume, Change
+    Fetches historical OHLCV data for a Korean ETF/ETN/Stock ticker using yfinance.
+    (Bypasses Naver Finance / KRX IP blocking on cloud servers)
     """
+    import yfinance as yf
+    
     if start_date is None:
-        # Default to last 1 year
         start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
     if end_date is None:
         end_date = datetime.now().strftime('%Y-%m-%d')
         
     try:
-        df = fdr.DataReader(ticker, start_date, end_date)
+        # Try KOSPI first
+        df = yf.download(f"{ticker}.KS", start=start_date, end=end_date, progress=False)
+        
+        # If empty, try KOSDAQ
+        if df.empty:
+            df = yf.download(f"{ticker}.KQ", start=start_date, end=end_date, progress=False)
+            
         if df.empty:
             raise ValueError(f"No data returned for KR ticker: {ticker}")
-        
+            
+        # Flatten MultiIndex columns if present (e.g. from newer yfinance versions)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.droplevel(1)
+            
         # Reset index to make Date a column
         df = df.reset_index()
-        # Standardize column names
+        # Rename standard Date column from yfinance
         df.rename(columns={'index': 'Date'}, inplace=True)
         return df
     except Exception as e:
-        print(f"Error fetching data for ticker {ticker}: {str(e)}")
+        print(f"Error fetching data for KR ticker {ticker}: {str(e)}")
         # Return an empty DataFrame with standard columns as fallback
         return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Change'])
 
