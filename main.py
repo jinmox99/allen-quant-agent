@@ -374,16 +374,6 @@ fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_20'], name="SMA 20", line=dict(
 fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_50'], name="SMA 50", line=dict(color="#f59e0b", width=1.5)), row=1, col=1)
 fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA_120'], name="SMA 120", line=dict(color="#ec4899", width=1.5)), row=1, col=1)
 
-# Bollinger Bands Outline (Light grey fill)
-fig.add_trace(go.Scatter(
-    x=df['Date'].tolist() + df['Date'].tolist()[::-1],
-    y=df['BB_Upper'].tolist() + df['BB_Lower'].tolist()[::-1],
-    fill='toself',
-    fillcolor='rgba(255, 255, 255, 0.05)',
-    line=dict(color='rgba(255,255,255,0)'),
-    hoverinfo="skip",
-    name="Bollinger Bands"
-), row=1, col=1)
 
 
 # 2. MACD
