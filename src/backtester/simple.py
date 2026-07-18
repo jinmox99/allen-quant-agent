@@ -260,11 +260,6 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
                 sell_shares = shares
                 cash += shares * close
                 shares = 0.0
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "과열 익절 (RSI 70 이상)"})
-                
-        val = cash + (shares * end_price)
-        return {"return": ((val - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
-
     def simulate_dual_momentum():
         desc = "1개월, 3개월, 6개월 전 주가와 비교하여 모든 기간에서 주가가 상승했을 때만 100% 주식을 보유하고, 단기 추세가 꺾이면 전량 현금화하는 극강의 방어형 전략입니다."
         cash = initial_capital
@@ -301,11 +296,7 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         "단순 보유 (Buy & Hold)": {"return": bh_return, "trades": bh_trades, "desc": "가장 기본이 되는 벤치마크. 첫날에 현금을 전액 주식에 몰빵한 뒤, 끝까지 가만히 들고 있었을 경우의 수익률입니다."},
         "이동평균선 (SMA)": simulate(sma_sig, "주가가 20일선 위로 올라타면 전액 매수, 20일선 밑으로 깨고 내려가면 전액 매도합니다. 대세 추세를 따라갈 때 유리합니다."),
         "MACD": simulate(macd_sig, "단기 추세선이 장기 추세선을 상향 돌파(골든크로스)하면 전액 매수, 하향 돌파(데드크로스)하면 전액 매도합니다."),
-        "RSI": simulate(rsi_sig, "RSI가 30 이하(과매도)로 떨어지면 싼 값이라 판단해 전액 매수, 70 이상(과매수)으로 올라가면 비싸다 판단해 전액 매도합니다."),
-        "볼린저 밴드 (BB)": simulate(bb_sig, "주가가 볼린저 밴드 하단에 닿거나 뚫고 내려가면 전액 매수, 밴드 상단에 닿거나 뚫고 올라가면 전액 매도합니다."),
         "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum(),
         "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross(),
-        "💎 🌊 BB 스퀴즈 돌파": simulate_bb_squeeze(),
-        "💎 🎣 RSI 다이버전스": simulate_rsi_div(),
         "💎 🛡️ 듀얼 모멘텀": simulate_dual_momentum()
     }

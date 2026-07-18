@@ -2,20 +2,15 @@ import pandas as pd
 
 def analyze_trend(df: pd.DataFrame) -> dict:
     """
-    Analyzes technical indicators and returns individual signals for SMA, MACD, RSI, and BB.
+    Analyzes technical indicators and returns individual signals for SMA, MACD, and others.
     """
     if df.empty or len(df) < 50:
         default_signal = {"status": "데이터 부족", "message": "데이터가 부족합니다.", "color": "#94a3b8"}
         return {
-
             "sma": default_signal,
             "macd": default_signal,
-            "rsi": default_signal,
-            "bb": default_signal,
             "quant_momentum": default_signal,
             "ema_cross": default_signal,
-            "bb_squeeze": default_signal,
-            "rsi_div": default_signal,
             "dual_momentum": default_signal
         }
         
@@ -31,12 +26,6 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     macd_signal = latest['MACD_Signal']
     macd_hist = latest['MACD_Hist']
     macd_hist_prev = prev['MACD_Hist']
-    
-    rsi = latest['RSI']
-    bb_lower = latest['BB_Lower']
-    bb_upper = latest['BB_Upper']
-    low = latest['Low']
-    high = latest['High']
     
     signals = {}
     
@@ -101,23 +90,6 @@ def analyze_trend(df: pd.DataFrame) -> dict:
         signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e"}
     else:
         signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b"}
-
-    # 7. BB Squeeze
-    bb_width_prev = prev['BB_Width'] if 'BB_Width' in prev else 100
-    if bb_width_prev < 10.0 and close > bb_upper:
-        signals["bb_squeeze"] = {"status": "상단 돌파 (매수)", "message": "에너지를 꽉 응축한 스퀴즈 상태에서 상단을 뚫고 대세 상승을 시작했습니다.", "color": "#10b981"}
-    elif bb_width_prev < 10.0:
-        signals["bb_squeeze"] = {"status": "스퀴즈 (응축기)", "message": "밴드 폭이 매우 좁아 곧 큰 변동성이 터질 준비를 하고 있습니다.", "color": "#38bdf8"}
-    else:
-        signals["bb_squeeze"] = {"status": "정상 변동성", "message": "일반적인 밴드 변동성 구간입니다.", "color": "#64748b"}
-
-    # 8. RSI Divergence
-    min_rsi_prev = prev['Min_RSI_20'] if 'Min_RSI_20' in prev else 50
-    min_close_prev = prev['Min_Close_20'] if 'Min_Close_20' in prev else close
-    if close < min_close_prev and rsi > min_rsi_prev and rsi < 40:
-        signals["rsi_div"] = {"status": "다이버전스 포착 (바닥 줍기)", "message": "주가는 신저가를 갱신했지만 RSI는 저점을 높이는 다이버전스가 발생했습니다. 강력한 바닥 매수 타이밍입니다.", "color": "#a855f7"}
-    else:
-        signals["rsi_div"] = {"status": "다이버전스 없음", "message": "특이한 RSI 다이버전스 패턴이 보이지 않습니다.", "color": "#64748b"}
 
     import numpy as np
     # 9. Dual Momentum

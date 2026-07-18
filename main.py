@@ -204,11 +204,9 @@ def render_status_panel(title, icon, signal):
 
 with col_s1:
     st.markdown(render_status_panel("이동평균선 (SMA)", "📊", trend_result['sma']), unsafe_allow_html=True)
-    st.markdown(render_status_panel("상대강도지수 (RSI)", "📉", trend_result['rsi']), unsafe_allow_html=True)
 
 with col_s2:
     st.markdown(render_status_panel("MACD 오실레이터", "📈", trend_result['macd']), unsafe_allow_html=True)
-    st.markdown(render_status_panel("볼린저 밴드 (BB)", "🌊", trend_result['bb']), unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -220,8 +218,6 @@ st.markdown("<p style='color:#94a3b8; font-size:14px;'>Buy & Hold 벤치마크�
 ACTIVE_STRATEGIES = [
     ("퀀트 모멘텀", "💎", "quant_momentum"),
     ("EMA 5/20 교차", "⚡", "ema_cross"),
-    ("BB 스퀴즈 돌파", "🌊", "bb_squeeze"),
-    ("RSI 다이버전스", "🎣", "rsi_div"),
     ("듀얼 모멘텀", "🛡️", "dual_momentum")
 ]
 
