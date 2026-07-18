@@ -114,7 +114,7 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     # 8. HYBRID (복합 모멘텀)
     if rsi >= 70:
         signals["hybrid"] = {"status": "과열 (부분 익절)", "message": "RSI가 70을 돌파하여 단기 과열되었습니다. 보유 물량의 50%를 덜어내 수익을 챙길 시점입니다.", "color": "#f59e0b"}
-    elif macd_prev >= macd_signal_prev and macd < macd_signal:
+    elif prev['MACD'] >= prev['MACD_Signal'] and macd < macd_signal:
         signals["hybrid"] = {"status": "추세 붕괴 (전량 매도)", "message": "MACD 데드크로스가 발생했습니다. 상승 에너지가 끝났으므로 남은 주식을 전량 매도하고 관망해야 합니다.", "color": "#ef4444"}
     elif rsi <= 30:
         signals["hybrid"] = {"status": "투매 포착 (바닥 줍기)", "message": "RSI가 30 이하로 심한 투매가 나왔습니다. 현금의 50%를 투입해 바닥에서 싸게 주워 담을 시점입니다.", "color": "#a855f7"}
