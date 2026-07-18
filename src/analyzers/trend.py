@@ -29,6 +29,7 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     
     signals = {}
     
+    import math
     import numpy as np
     
     # helper to clip values
@@ -40,19 +41,19 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     sma_ratio = (sma20 - sma50) / sma50 if sma50 > 0 else 0
     
     if close < sma20 and sma20 < sma50:
-        score = clip_score(int(max(0, min(19, (close_ratio + 0.05) * 200))))
+        score = clip_score(25 - 25 * math.tanh(max(0, -close_ratio) / 0.05))
         signals["sma"] = {"status": "역배열 하락세", "message": "주가가 20일선 아래에 있으며, 20일선이 50일선 아래인 완연한 하락 추세입니다.", "color": "#ef4444", "score": score}
     elif close > sma20 and sma20 > sma50:
-        score = clip_score(75 + int(max(0, min(25, close_ratio * 500))))
+        score = clip_score(75 + 25 * math.tanh(max(0, close_ratio) / 0.05))
         signals["sma"] = {"status": "정배열 상승세", "message": "단기, 중기 이평선이 정배열을 이루며 탄탄한 상승 추세를 그리고 있습니다.", "color": "#10b981", "score": score}
     elif sma20 < sma20_prev and close < sma20:
-        score = clip_score(20 + int(max(0, min(19, (close_ratio + 0.03) * 400))))
+        score = clip_score(30 - 20 * math.tanh(max(0, -close_ratio) / 0.05))
         signals["sma"] = {"status": "단기 하락 전환", "message": "20일선이 꺾이고 주가가 그 아래로 내려가 단기 하락(조정)이 진행 중입니다.", "color": "#f43f5e", "score": score}
     elif sma20 > sma20_prev and close > sma20:
-        score = clip_score(60 + int(max(0, min(14, close_ratio * 300))))
+        score = clip_score(60 + 15 * math.tanh(max(0, close_ratio) / 0.05))
         signals["sma"] = {"status": "단기 반등세", "message": "20일선 위로 주가가 올라타며 단기적인 반등세가 나타나고 있습니다.", "color": "#34d399", "score": score}
     else:
-        score = clip_score(40 + int(max(0, min(19, (close_ratio + 0.02) * 500))))
+        score = clip_score(40 + 20 * (math.tanh(close_ratio / 0.02) + 1) / 2)
         signals["sma"] = {"status": "방향성 탐색 중", "message": "이동평균선 간 거리가 좁혀지며 뚜렷한 추세가 없는 횡보 구간입니다.", "color": "#64748b", "score": score}
 
     # 2. MACD 분석
@@ -62,30 +63,30 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     macd_z = macd_hist / hist_std
     
     if macd > macd_signal and macd_hist > macd_hist_prev:
-        score = clip_score(75 + int(max(0, min(25, macd_z * 12.5))))
+        score = clip_score(75 + 25 * math.tanh(max(0, macd_z) / 1.5))
         signals["macd"] = {"status": "강한 매수 시그널", "message": "MACD가 시그널을 상회하고 히스토그램이 커지는 상승 모멘텀 확장 구간입니다.", "color": "#10b981", "score": score}
     elif macd > macd_signal and macd_hist <= macd_hist_prev:
-        score = clip_score(55 + int(max(0, min(19, macd_z * 10))))
+        score = clip_score(55 + 20 * math.tanh(max(0, macd_z) / 1.5))
         signals["macd"] = {"status": "상승 둔화", "message": "MACD가 시그널 위에 있으나 상승 탄력이 점점 줄어들고 있습니다.", "color": "#f59e0b", "score": score}
     elif macd < macd_signal and macd_hist < macd_hist_prev:
-        score = clip_score(int(max(0, min(39, (macd_z + 2.0) * 10))))
+        score = clip_score(25 - 25 * math.tanh(max(0, -macd_z) / 1.5))
         signals["macd"] = {"status": "강한 매도 시그널", "message": "MACD가 시그널을 하회하며 하락 모멘텀이 거세지고 있습니다.", "color": "#ef4444", "score": score}
     elif macd < macd_signal and macd_hist >= macd_hist_prev:
-        score = clip_score(40 + int(max(0, min(14, (macd_z + 1.0) * 7.5))))
+        score = clip_score(40 + 15 * (math.tanh(macd_z / 1.5) + 1) / 2)
         signals["macd"] = {"status": "하락 둔화 (반등 조짐)", "message": "MACD가 시그널 아래에 있으나 하락폭이 좁혀지며 반등 에너지가 모이고 있습니다.", "color": "#38bdf8", "score": score}
     else:
-        score = clip_score(40 + int(max(0, min(14, (macd_z + 0.5) * 15))))
+        score = clip_score(40 + 20 * (math.tanh(macd_z / 1.5) + 1) / 2)
         signals["macd"] = {"status": "중립 (신호 혼재)", "message": "MACD 뚜렷한 모멘텀을 보이지 않고 있습니다.", "color": "#64748b", "score": score}
 
     # 5. Quant Momentum (퀀트 모멘텀)
     if close < sma20 and macd < macd_signal:
-        score = clip_score(int(max(0, min(39, (close_ratio + 0.05) * 400))))
+        score = clip_score(25 - 25 * math.tanh(max(0, -close_ratio) / 0.05))
         signals["quant_momentum"] = {"status": "위험 (폭락 징후)", "message": "추세선(20일)과 모멘텀(MACD)이 동시에 무너졌습니다. 전액 매도(100% 현금화)가 유리한 구간입니다.", "color": "#ef4444", "score": score}
     elif close > sma20 or macd > macd_signal:
-        score = clip_score(60 + int(max(0, min(40, (close_ratio + 0.02) * 500))))
+        score = clip_score(60 + 40 * math.tanh(max(0, close_ratio) / 0.05))
         signals["quant_momentum"] = {"status": "양호 (추세 유지)", "message": "상승 추세 혹은 모멘텀이 살아있어 100% 주식을 보유하며 끝까지 수익을 극대화할 수 있는 구간입니다.", "color": "#10b981", "score": score}
     else:
-        score = clip_score(40 + int(max(0, min(19, (close_ratio + 0.02) * 500))))
+        score = clip_score(40 + 20 * (math.tanh(close_ratio / 0.02) + 1) / 2)
         signals["quant_momentum"] = {"status": "방향 탐색", "message": "추세 판단의 경계선에 위치해 있습니다.", "color": "#64748b", "score": score}
 
     # 6. EMA Cross (골든크로스)
@@ -94,13 +95,13 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     ema_diff_ratio = (ema5 - ema20) / ema20 if ema20 > 0 else 0
     
     if ema5 > ema20:
-        score = clip_score(65 + int(max(0, min(35, ema_diff_ratio * 1100))))
+        score = clip_score(65 + 35 * math.tanh(max(0, ema_diff_ratio) / 0.03))
         signals["ema_cross"] = {"status": "상승 국면 (골든크로스)", "message": "반응이 빠른 5일 EMA가 20일 EMA 위로 올라선 단기 상승장입니다.", "color": "#10b981", "score": score}
     elif ema5 < ema20:
-        score = clip_score(int(max(0, min(39, (ema_diff_ratio + 0.05) * 800))))
+        score = clip_score(35 - 35 * math.tanh(max(0, -ema_diff_ratio) / 0.03))
         signals["ema_cross"] = {"status": "하락 국면 (데드크로스)", "message": "5일 EMA가 20일 EMA 밑으로 떨어지며 단기 하락 압력이 커지고 있습니다.", "color": "#f43f5e", "score": score}
     else:
-        score = clip_score(40 + int(max(0, min(24, (ema_diff_ratio + 0.01) * 1200))))
+        score = clip_score(40 + 24 * (math.tanh(ema_diff_ratio / 0.01) + 1) / 2)
         signals["ema_cross"] = {"status": "교차 대기", "message": "단기선과 장기선이 겹쳐져 방향을 결정하는 중입니다.", "color": "#64748b", "score": score}
 
     # 9. Dual Momentum
@@ -118,14 +119,13 @@ def analyze_trend(df: pd.DataFrame) -> dict:
     avg_ret = (ret1 + ret3 + ret6) / 3
     
     if cond1 and cond3 and cond6:
-        score = clip_score(75 + int(max(0, min(25, avg_ret * 250))))
+        score = clip_score(75 + 25 * math.tanh(max(0, avg_ret) / 0.10))
         signals["dual_momentum"] = {"status": "트리플 크라운 (홀딩)", "message": "1, 3, 6개월 단기/중기/장기 모멘텀이 모두 살아있는 강력한 상승장입니다.", "color": "#10b981", "score": score}
     elif (not cond1) and (not cond3):
-        score = clip_score(int(max(0, min(39, (avg_ret + 0.05) * 800))))
+        score = clip_score(25 - 25 * math.tanh(max(0, -avg_ret) / 0.10))
         signals["dual_momentum"] = {"status": "모멘텀 붕괴 (현금화)", "message": "단기와 중기 모멘텀이 모두 꺾였습니다. 리스크 관리를 위해 전량 현금화가 필요합니다.", "color": "#ef4444", "score": score}
     else:
-        # Limit mixed trend to 40~65 range
-        score = clip_score(40 + int(max(0, min(25, (avg_ret + 0.05) * 250))))
+        score = clip_score(40 + 20 * (math.tanh(avg_ret / 0.10) + 1) / 2)
         signals["dual_momentum"] = {"status": "혼조세", "message": "타임프레임별 모멘텀이 엇갈리고 있습니다.", "color": "#f59e0b", "score": score}
 
     return signals
