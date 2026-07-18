@@ -114,21 +114,13 @@ def load_favorites():
         "KR": {
             "삼성전자": "005930",
             "SK하이닉스": "000660",
-            "현대차": "005380",
-            "카카오": "035720",
-            "NAVER": "035420",
-            "에코프로비엠": "247540",
-            "셀트리온": "068270"
+            "KODEX 200 (코스피200 ETF)": "069500"
         },
         "US": {
             "애플 (AAPL)": "AAPL",
-            "테슬라 (TSLA)": "TSLA",
-            "엔비디아 (NVDA)": "NVDA",
-            "마이크로소프트 (MSFT)": "MSFT",
-            "알파벳 (GOOGL)": "GOOGL",
-            "아마존 (AMZN)": "AMZN",
-            "메타 (META)": "META",
-            "비트코인 (BTC-USD)": "BTC-USD"
+            "반도체 ETF (SOXX)": "SOXX",
+            "DRAM": "DRAM",
+            "한국 ETF (EWY)": "EWY"
         }
     }
 
