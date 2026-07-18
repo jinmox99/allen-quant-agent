@@ -63,6 +63,7 @@ def add_all_indicators(df: pd.DataFrame, column: str = 'Close') -> pd.DataFrame:
     df_out['SMA_120'] = calculate_sma(df_out, 120, 'Close')
     
     # Exponential Moving Averages
+    df_out['EMA_5'] = calculate_ema(df_out, 5, 'Close')
     df_out['EMA_10'] = calculate_ema(df_out, 10, 'Close')
     df_out['EMA_20'] = calculate_ema(df_out, 20, 'Close')
     df_out['EMA_50'] = calculate_ema(df_out, 50, 'Close')
@@ -82,6 +83,11 @@ def add_all_indicators(df: pd.DataFrame, column: str = 'Close') -> pd.DataFrame:
     df_out['BB_Upper'] = bb['BB_Upper']
     df_out['BB_Lower'] = bb['BB_Lower']
     
+    # Donchian Channels (Turtle Trading)
+    if 'High' in df_out.columns and 'Low' in df_out.columns:
+        df_out['Donchian_High_20'] = df_out['High'].rolling(window=20).max().shift(1)
+        df_out['Donchian_Low_10'] = df_out['Low'].rolling(window=10).min().shift(1)
+        
     # Daily returns
     df_out['Daily_Return'] = df_out['Close'].pct_change()
     

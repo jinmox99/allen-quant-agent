@@ -71,7 +71,7 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
     bb_sig[(df['High'] >= df['BB_Upper']) | (df['Close'] >= df['BB_Upper']*0.99)] = -1
 
     # ==========================================
-    # Smart Strategy: 퀀트 모멘텀 (알파 추구형)
+    # Smart Strategies: 퀀트 모멘텀, 터틀 트레이딩, 골든크로스
     # ==========================================
     
     def simulate_quant_momentum():
@@ -102,11 +102,69 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
 
+    def simulate_turtle_trading():
+        desc = "리처드 데니스의 전설적인 '터틀 트레이딩' 추세 추종 전략입니다. 주가가 최근 20일간의 최고점(신고가)을 돌파하면 대세 상승의 시작으로 보고 전액 매수합니다. 반대로 주가가 최근 10일간의 최저점(신저가) 밑으로 깨지면 미련 없이 전액 매도(손절/익절)하여 빠져나옵니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        
+        for i in range(1, len(df)):
+            close_p = float(df['Close'].iloc[i])
+            donchian_high = float(df['Donchian_High_20'].iloc[i]) if 'Donchian_High_20' in df.columns and not np.isnan(df['Donchian_High_20'].iloc[i]) else float('inf')
+            donchian_low = float(df['Donchian_Low_10'].iloc[i]) if 'Donchian_Low_10' in df.columns and not np.isnan(df['Donchian_Low_10'].iloc[i]) else 0
+            date_str = dates.iloc[i]
+            
+            # 매수 (20일 신고가 돌파)
+            if close_p > donchian_high and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "20일 신고가 돌파 (대세 상승)"})
+                cash = 0.0
+                
+            # 매도 (10일 신저가 이탈)
+            elif close_p < donchian_low and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "10일 신저가 이탈 (추세 이탈)"})
+                shares = 0.0
+                
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+
+    def simulate_ema_cross():
+        desc = "반응이 느린 단순이동평균(SMA) 대신, 최근 가격에 가중치를 두어 반응을 극한으로 끌어올린 지수이동평균(EMA) 5일선과 20일선의 교차 전략입니다. 단기 5일선이 장기 20일선을 위로 뚫으면(골든크로스) 매수하고, 아래로 뚫으면(데드크로스) 칼같이 매도하여 하락장을 빠르게 피합니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        
+        for i in range(1, len(df)):
+            close_p = float(df['Close'].iloc[i])
+            ema5_prev = float(df['EMA_5'].iloc[i-1]) if 'EMA_5' in df.columns and not np.isnan(df['EMA_5'].iloc[i-1]) else 0
+            ema20_prev = float(df['EMA_20'].iloc[i-1]) if 'EMA_20' in df.columns and not np.isnan(df['EMA_20'].iloc[i-1]) else 0
+            ema5 = float(df['EMA_5'].iloc[i]) if 'EMA_5' in df.columns and not np.isnan(df['EMA_5'].iloc[i]) else 0
+            ema20 = float(df['EMA_20'].iloc[i]) if 'EMA_20' in df.columns and not np.isnan(df['EMA_20'].iloc[i]) else 0
+            date_str = dates.iloc[i]
+            
+            # 골든크로스 매수
+            if (ema5_prev <= ema20_prev and ema5 > ema20) and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "EMA 5/20 골든크로스 (단기 상승)"})
+                cash = 0.0
+                
+            # 데드크로스 매도
+            elif (ema5_prev >= ema20_prev and ema5 < ema20) and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "EMA 5/20 데드크로스 (단기 하락)"})
+                shares = 0.0
+                
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
+
     return {
         "단순 보유 (Buy & Hold)": {"return": bh_return, "trades": bh_trades, "desc": "가장 기본이 되는 벤치마크. 첫날에 현금을 전액 주식에 몰빵한 뒤, 끝까지 가만히 들고 있었을 경우의 수익률입니다."},
         "이동평균선 (SMA)": simulate(sma_sig, "주가가 20일선 위로 올라타면 전액 매수, 20일선 밑으로 깨고 내려가면 전액 매도합니다. 대세 추세를 따라갈 때 유리합니다."),
         "MACD": simulate(macd_sig, "단기 추세선이 장기 추세선을 상향 돌파(골든크로스)하면 전액 매수, 하향 돌파(데드크로스)하면 전액 매도합니다."),
         "RSI": simulate(rsi_sig, "RSI가 30 이하(과매도)로 떨어지면 싼 값이라 판단해 전액 매수, 70 이상(과매수)으로 올라가면 비싸다 판단해 전액 매도합니다."),
         "볼린저 밴드 (BB)": simulate(bb_sig, "주가가 볼린저 밴드 하단에 닿거나 뚫고 내려가면 전액 매수, 밴드 상단에 닿거나 뚫고 올라가면 전액 매도합니다."),
-        "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum()
+        "💎 퀀트 모멘텀 (알파 추구형)": simulate_quant_momentum(),
+        "💎 🐢 터틀 트레이딩 (신고가 돌파)": simulate_turtle_trading(),
+        "💎 ⚡ 골든크로스 EMA (5/20)": simulate_ema_cross()
     }
