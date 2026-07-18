@@ -16,7 +16,7 @@ def get_us_assets():
 
 import streamlit as st
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """
     Fetches historical OHLCV data for a US leveraged ETF ticker using yfinance.
@@ -54,7 +54,7 @@ def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None)
         print(f"Error fetching US data for ticker {ticker}: {str(e)}")
         return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def get_us_stock_info(ticker: str) -> dict:
     """
     Returns metadata and current price information for a US asset.
