@@ -110,6 +110,71 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
 
+    def simulate_ema_cross():
+        desc = "반응이 느린 단순이동평균(SMA) 대신, 최근 가격에 가중치를 두어 반응을 극한으로 끌어올린 지수이동평균(EMA) 5일선과 20일선의 교차 전략입니다. 단기 5일선이 장기 20일선을 위로 뚫으면(골든크로스) 매수하고, 아래로 뚫으면(데드크로스) 칼같이 매도하여 하락장을 빠르게 피합니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        history = [initial_capital]
+        
+        for i in range(1, len(df)):
+            close_p = float(df['Close'].iloc[i])
+            ema5_prev = float(df['EMA_5'].iloc[i-1]) if 'EMA_5' in df.columns and not np.isnan(df['EMA_5'].iloc[i-1]) else 0
+            ema20_prev = float(df['EMA_20'].iloc[i-1]) if 'EMA_20' in df.columns and not np.isnan(df['EMA_20'].iloc[i-1]) else 0
+            ema5 = float(df['EMA_5'].iloc[i]) if 'EMA_5' in df.columns and not np.isnan(df['EMA_5'].iloc[i]) else 0
+            ema20 = float(df['EMA_20'].iloc[i]) if 'EMA_20' in df.columns and not np.isnan(df['EMA_20'].iloc[i]) else 0
+            date_str = dates.iloc[i]
+            
+            # 골든크로스 매수
+            if (ema5_prev <= ema20_prev and ema5 > ema20) and cash > 0:
+                shares = cash / close_p
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": shares, "Reason": "EMA 5/20 골든크로스 (단기 상승)"})
+                cash = 0.0
+                
+            # 데드크로스 매도
+            elif (ema5_prev >= ema20_prev and ema5 < ema20) and shares > 0:
+                cash = shares * close_p
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": shares, "Reason": "EMA 5/20 데드크로스 (단기 하락)"})
+                shares = 0.0
+            history.append(cash + shares * close_p)
+                
+        final_value = cash + (shares * end_price)
+        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
+
+    def simulate_dual_momentum():
+        desc = "1개월, 3개월, 6개월 전 주가와 비교하여 모든 기간에서 주가가 상승했을 때만 100% 주식을 보유하고, 단기 추세가 꺾이면 전량 현금화하는 극강의 방어형 전략입니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
+        history = []
+        for i in range(len(df)):
+            close = float(df['Close'].iloc[i])
+            c1 = float(df['Close_1M_ago'].iloc[i]) if 'Close_1M_ago' in df.columns and not np.isnan(df['Close_1M_ago'].iloc[i]) else 0
+            c3 = float(df['Close_3M_ago'].iloc[i]) if 'Close_3M_ago' in df.columns and not np.isnan(df['Close_3M_ago'].iloc[i]) else 0
+            c6 = float(df['Close_6M_ago'].iloc[i]) if 'Close_6M_ago' in df.columns and not np.isnan(df['Close_6M_ago'].iloc[i]) else 0
+            date_str = dates.iloc[i]
+            
+            cond1 = (close > c1) if c1 > 0 else True
+            cond3 = (close > c3) if c3 > 0 else True
+            cond6 = (close > c6) if c6 > 0 else True
+            
+            # 매수: 1, 3, 6개월 전보다 현재 주가가 모두 높을 때
+            if cond1 and cond3 and cond6 and cash > 10:
+                buy_shares = cash / close
+                shares += buy_shares
+                cash = 0.0
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close, "Shares": buy_shares, "Reason": "듀얼 모멘텀 (모든 추세 상승)"})
+            # 매도: 1개월, 3개월 모멘텀이 모두 마이너스로 돌아서면
+            elif (not cond1) and (not cond3) and shares > 0:
+                sell_shares = shares
+                cash += shares * close
+                shares = 0.0
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close, "Shares": sell_shares, "Reason": "단기/중기 추세 꺾임 (현금화)"})
+            history.append(cash + shares * close)
+                
+        val = cash + (shares * end_price)
+        return {"return": ((val - initial_capital) / initial_capital) * 100, "mdd": calculate_mdd(history), "trades": trades, "desc": desc}
+
     def simulate_adx_trend():
         desc = "ADX(평균방향지수)로 추세의 '강도'를 측정합니다. ADX가 25를 넘고 +DI가 -DI 위에 있으면 강한 상승 추세로 판단하여 매수하고, ADX가 20 아래로 떨어지거나 -DI가 +DI를 상회하면 추세 소멸로 매도합니다."
         cash = initial_capital
