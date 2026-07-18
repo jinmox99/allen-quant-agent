@@ -314,11 +314,6 @@ with col_s1:
 with col_s2:
     st.markdown(render_status_panel("MACD 오실레이터", "📈", trend_result['macd'], trade_info_map.get('macd')), unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ----------------- AI SMART STRATEGIES PANELS -----------------
-st.markdown("### 💎 초과 수익 달성형 (알파) 지표 상태")
-st.markdown("<p style='color:#94a3b8; font-size:14px;'>Buy & Hold 벤치마크를 넘어서기 위해 설계된 공격적 추세 추종 전략들의 현재 시그널입니다.</p>", unsafe_allow_html=True)
 
 # 활성화된 퀀트 모멘텀 전략 리스트 (원하는 전략을 쉽게 추가/삭제 가능)
 ACTIVE_STRATEGIES = [
