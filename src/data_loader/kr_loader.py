@@ -76,6 +76,9 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None)
         df = df.reset_index()
         # Rename standard Date column from yfinance
         df.rename(columns={'index': 'Date'}, inplace=True)
+        # Drop rows with NaN Close values
+        if 'Close' in df.columns:
+            df = df.dropna(subset=['Close'])
         return df
     except Exception as e:
         print(f"Error fetching data for KR ticker {ticker}: {str(e)}")

@@ -43,6 +43,9 @@ def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None)
             
         # Reset index to make Date a column
         df = df.reset_index()
+        # Drop rows with NaN Close values
+        if 'Close' in df.columns:
+            df = df.dropna(subset=['Close'])
         return df
     except Exception as e:
         print(f"Error fetching US data for ticker {ticker}: {str(e)}")
