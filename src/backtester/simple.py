@@ -71,86 +71,38 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
     bb_sig[(df['High'] >= df['BB_Upper']) | (df['Close'] >= df['BB_Upper']*0.99)] = -1
 
     # ==========================================
-    # Smart Strategies (A, B, Hybrid)
+    # Smart Strategy: AI 실전 스윙 매매
     # ==========================================
     
-    def simulate_strategy_A():
-        desc = "100% 주식으로 시작. 지표가 과열(RSI >= 70 또는 볼린저 상단 돌파) 시 보유 주식의 30%를 익절하여 현금화합니다. 이후 주가가 20일선 밑으로 조정받을 때 모아둔 현금을 전액 재투자합니다."
-        cash = 0.0
-        shares = initial_capital / float(df['Close'].iloc[0])
-        trades = [{"Date": dates.iloc[0], "Action": "BUY", "Price": float(df['Close'].iloc[0]), "Shares": shares, "Reason": "초기 100% 매수"}]
+    def simulate_ai_swing():
+        desc = "100% 현금으로 관망하며 시작합니다. 투매 시(RSI <= 30 또는 밴드 하단 터치) 보유 현금의 50%를 투입하여 바닥에서 분할 매수하고, 과열 시(RSI >= 70 또는 밴드 상단 돌파) 보유 주식의 50%를 분할 익절하는 가장 현실적인 실전 스윙 퀀트 전략입니다."
+        cash = initial_capital
+        shares = 0.0
+        trades = []
         
-        for i in range(1, len(df)):
+        for i in range(len(df)):
             close_p = float(df['Close'].iloc[i])
             high_p = float(df['High'].iloc[i])
-            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
-            bb_upper = float(df['BB_Upper'].iloc[i]) if not np.isnan(df['BB_Upper'].iloc[i]) else float('inf')
-            sma20 = float(df['SMA_20'].iloc[i]) if not np.isnan(df['SMA_20'].iloc[i]) else 0
-            date_str = dates.iloc[i]
-            
-            if (rsi >= 70 or high_p >= bb_upper) and shares > 0:
-                sell_shares = shares * 0.3
-                cash += sell_shares * close_p
-                shares -= sell_shares
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "과열 징후 (30% 익절)"})
-            elif close_p <= sma20 and cash > 0:
-                buy_shares = cash / close_p
-                shares += buy_shares
-                cash = 0.0
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "20일선 조정 (전액 재매수)"})
-                
-        final_value = cash + (shares * end_price)
-        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
-
-    def simulate_strategy_B():
-        desc = "50% 주식, 50% 현금으로 여유있게 시작. 시장이 투매(RSI <= 30 또는 볼린저 하단 이탈)를 보일 때마다 보유 현금의 절반을 투입하여 분할 매수(바닥 줍기)합니다. 매도는 하지 않습니다."
-        cash = initial_capital * 0.5
-        shares = (initial_capital * 0.5) / float(df['Close'].iloc[0])
-        trades = [{"Date": dates.iloc[0], "Action": "BUY", "Price": float(df['Close'].iloc[0]), "Shares": shares, "Reason": "초기 50% 매수"}]
-        
-        for i in range(1, len(df)):
-            close_p = float(df['Close'].iloc[i])
             low_p = float(df['Low'].iloc[i])
             rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
+            bb_upper = float(df['BB_Upper'].iloc[i]) if not np.isnan(df['BB_Upper'].iloc[i]) else float('inf')
             bb_lower = float(df['BB_Lower'].iloc[i]) if not np.isnan(df['BB_Lower'].iloc[i]) else 0
             date_str = dates.iloc[i]
             
+            # 매수 (Buy on Dip)
             if (rsi <= 30 or low_p <= bb_lower) and cash > 10:
                 buy_cash = cash * 0.5
                 buy_shares = buy_cash / close_p
                 shares += buy_shares
                 cash -= buy_cash
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "투매 포착 (50% 분할매수)"})
+                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "투매 포착 (보유 현금 50% 매수)"})
                 
-        final_value = cash + (shares * end_price)
-        return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
-
-    def simulate_hybrid():
-        desc = "70% 주식, 30% 현금으로 시작. 전략 A(부분 익절)와 전략 B(바닥 분할매수)를 결합한 최고의 리스크 관리 전략입니다. 오를 때 30%씩 덜어내고, 폭락할 때 50%씩 줍습니다."
-        cash = initial_capital * 0.3
-        shares = (initial_capital * 0.7) / float(df['Close'].iloc[0])
-        trades = [{"Date": dates.iloc[0], "Action": "BUY", "Price": float(df['Close'].iloc[0]), "Shares": shares, "Reason": "초기 70% 매수"}]
-        
-        for i in range(1, len(df)):
-            close_p = float(df['Close'].iloc[i])
-            high_p = float(df['High'].iloc[i])
-            low_p = float(df['Low'].iloc[i])
-            rsi = float(df['RSI'].iloc[i]) if not np.isnan(df['RSI'].iloc[i]) else 50
-            bb_upper = float(df['BB_Upper'].iloc[i]) if not np.isnan(df['BB_Upper'].iloc[i]) else float('inf')
-            bb_lower = float(df['BB_Lower'].iloc[i]) if not np.isnan(df['BB_Lower'].iloc[i]) else 0
-            date_str = dates.iloc[i]
-            
-            if (rsi >= 70 or high_p >= bb_upper) and shares > 0:
-                sell_shares = shares * 0.3
+            # 매도 (Sell on Rip)
+            elif (rsi >= 70 or high_p >= bb_upper) and shares > 0:
+                sell_shares = shares * 0.5
                 cash += sell_shares * close_p
                 shares -= sell_shares
-                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "과열 징후 (30% 익절)"})
-            elif (rsi <= 30 or low_p <= bb_lower) and cash > 10:
-                buy_cash = cash * 0.5
-                buy_shares = buy_cash / close_p
-                shares += buy_shares
-                cash -= buy_cash
-                trades.append({"Date": date_str, "Action": "BUY", "Price": close_p, "Shares": buy_shares, "Reason": "투매 포착 (50% 분할매수)"})
+                trades.append({"Date": date_str, "Action": "SELL", "Price": close_p, "Shares": sell_shares, "Reason": "과열 징후 (보유 주식 50% 익절)"})
                 
         final_value = cash + (shares * end_price)
         return {"return": ((final_value - initial_capital) / initial_capital) * 100, "trades": trades, "desc": desc}
@@ -161,7 +113,5 @@ def run_indicator_backtests(df: pd.DataFrame, initial_capital: float = 10000.0) 
         "MACD": simulate(macd_sig, "단기 추세선이 장기 추세선을 상향 돌파(골든크로스)하면 전액 매수, 하향 돌파(데드크로스)하면 전액 매도합니다."),
         "RSI": simulate(rsi_sig, "RSI가 30 이하(과매도)로 떨어지면 싼 값이라 판단해 전액 매수, 70 이상(과매수)으로 올라가면 비싸다 판단해 전액 매도합니다."),
         "볼린저 밴드 (BB)": simulate(bb_sig, "주가가 볼린저 밴드 하단에 닿거나 뚫고 내려가면 전액 매수, 밴드 상단에 닿거나 뚫고 올라가면 전액 매도합니다."),
-        "💡 전략 A (부분 익절)": simulate_strategy_A(),
-        "💡 전략 B (바닥 줍기)": simulate_strategy_B(),
-        "💎 스마트 하이브리드": simulate_hybrid()
+        "💎 AI 실전 스윙 전략": simulate_ai_swing()
     }
