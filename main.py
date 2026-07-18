@@ -264,13 +264,7 @@ trade_info_map = {}
 for key, name in [('sma', '이동평균선 (SMA)'), ('macd', 'MACD'), 
                   ('quant_momentum', '💎 퀀트 모멘텀 (알파 추구형)'), 
                   ('ema_cross', '💎 ⚡ 골든크로스 EMA (5/20)'), 
-                  ('dual_momentum', '💎 🛡️ 듀얼 모멘텀'),
-                  ('adx_trend', '📊 ADX 추세 강도'),
-                  ('stochastic', '🔄 스토캐스틱'),
-                  ('ichimoku', '☁️ 이치모쿠 구름'),
-                  ('obv', '📦 OBV 거래량 균형'),
-                  ('parabolic_sar', '🔴 파라볼릭 SAR'),
-                  ('vwap', '🏛️ VWAP 기관 추종')]:
+                  ('dual_momentum', '💎 🛡️ 듀얼 모멘텀')]:
     if backtest_results and name in backtest_results and backtest_results[name]['trades']:
         last_trade = backtest_results[name]['trades'][-1]
         trade_price = last_trade['Price']

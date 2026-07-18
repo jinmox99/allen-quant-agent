@@ -11,13 +11,7 @@ def analyze_trend(df: pd.DataFrame) -> dict:
             "macd": default_signal,
             "quant_momentum": default_signal,
             "ema_cross": default_signal,
-            "dual_momentum": default_signal,
-            "adx_trend": default_signal,
-            "stochastic": default_signal,
-            "ichimoku": default_signal,
-            "obv": default_signal,
-            "parabolic_sar": default_signal,
-            "vwap": default_signal
+            "dual_momentum": default_signal
         }
         
     latest = df.iloc[-1]
@@ -95,73 +89,5 @@ def analyze_trend(df: pd.DataFrame) -> dict:
         signals["dual_momentum"] = {"status": "모멘텀 붕괴 (현금화)", "message": "단기와 중기 모멘텀이 모두 꺾였습니다. 리스크 관리를 위해 전량 현금화가 필요합니다.", "color": "#ef4444"}
     else:
         signals["dual_momentum"] = {"status": "혼조세", "message": "타임프레임별 모멘텀이 엇갈리고 있습니다.", "color": "#f59e0b"}
-
-    # 10. ADX Trend
-    adx = latest['ADX'] if 'ADX' in latest and not np.isnan(latest['ADX']) else 0
-    plus_di = latest['Plus_DI'] if 'Plus_DI' in latest and not np.isnan(latest['Plus_DI']) else 0
-    minus_di = latest['Minus_DI'] if 'Minus_DI' in latest and not np.isnan(latest['Minus_DI']) else 0
-    if adx > 25 and plus_di > minus_di:
-        signals["adx_trend"] = {"status": f"강한 상승 추세 (ADX {adx:.0f})", "message": f"+DI({plus_di:.0f})가 -DI({minus_di:.0f})를 압도하며 강력한 상승 추세가 확인됩니다.", "color": "#10b981"}
-    elif adx > 25 and minus_di > plus_di:
-        signals["adx_trend"] = {"status": f"강한 하락 추세 (ADX {adx:.0f})", "message": f"-DI({minus_di:.0f})가 +DI({plus_di:.0f})를 압도하며 하락 추세가 강합니다.", "color": "#ef4444"}
-    elif adx < 20:
-        signals["adx_trend"] = {"status": f"추세 없음 (ADX {adx:.0f})", "message": "ADX가 20 미만으로 뚜렷한 추세가 없는 횡보 구간입니다.", "color": "#64748b"}
-    else:
-        signals["adx_trend"] = {"status": f"추세 형성 중 (ADX {adx:.0f})", "message": "추세가 형성되기 시작하는 단계입니다. 방향 확인이 필요합니다.", "color": "#f59e0b"}
-
-    # 11. Stochastic
-    stoch_k = latest['Stoch_K'] if 'Stoch_K' in latest and not np.isnan(latest['Stoch_K']) else 50
-    stoch_d = latest['Stoch_D'] if 'Stoch_D' in latest and not np.isnan(latest['Stoch_D']) else 50
-    if stoch_k < 20:
-        signals["stochastic"] = {"status": f"과매도 구간 (%K={stoch_k:.0f})", "message": "극단적 과매도 영역으로, 반등 가능성이 높습니다.", "color": "#38bdf8"}
-    elif stoch_k > 80:
-        signals["stochastic"] = {"status": f"과매수 구간 (%K={stoch_k:.0f})", "message": "극단적 과매수 영역으로, 조정 가능성이 있습니다.", "color": "#f43f5e"}
-    elif stoch_k > stoch_d:
-        signals["stochastic"] = {"status": f"상승 모멘텀 (%K={stoch_k:.0f})", "message": "%K가 %D 위에서 상승 탄력을 유지하고 있습니다.", "color": "#10b981"}
-    else:
-        signals["stochastic"] = {"status": f"하락 모멘텀 (%K={stoch_k:.0f})", "message": "%K가 %D 아래로 내려가며 하락 압력이 존재합니다.", "color": "#ef4444"}
-
-    # 12. Ichimoku Cloud
-    span_a = latest['Ichimoku_SpanA'] if 'Ichimoku_SpanA' in latest and not np.isnan(latest['Ichimoku_SpanA']) else close
-    span_b = latest['Ichimoku_SpanB'] if 'Ichimoku_SpanB' in latest and not np.isnan(latest['Ichimoku_SpanB']) else close
-    cloud_top = max(span_a, span_b)
-    cloud_bottom = min(span_a, span_b)
-    if close > cloud_top:
-        signals["ichimoku"] = {"status": "구름대 위 (상승장)", "message": "주가가 구름대 위에 있어 강한 상승 추세가 확인됩니다.", "color": "#10b981"}
-    elif close < cloud_bottom:
-        signals["ichimoku"] = {"status": "구름대 아래 (하락장)", "message": "주가가 구름대 아래에 있어 하락 추세가 지속되고 있습니다.", "color": "#ef4444"}
-    else:
-        signals["ichimoku"] = {"status": "구름대 내부 (방향 탐색)", "message": "주가가 구름대 안에서 방향을 결정하는 중입니다.", "color": "#f59e0b"}
-
-    # 13. OBV
-    if 'OBV' in latest and 'OBV_MA' in latest and not np.isnan(latest['OBV']) and not np.isnan(latest['OBV_MA']):
-        obv = latest['OBV']
-        obv_ma = latest['OBV_MA']
-        if obv > obv_ma:
-            signals["obv"] = {"status": "매집 진행 중", "message": "OBV가 20일 평균 위에 있어 세력의 매집이 감지됩니다.", "color": "#10b981"}
-        else:
-            signals["obv"] = {"status": "분배 진행 중", "message": "OBV가 20일 평균 아래로, 세력의 매도(분배)가 진행 중입니다.", "color": "#ef4444"}
-    else:
-        signals["obv"] = {"status": "데이터 없음", "message": "거래량 데이터가 없어 OBV를 계산할 수 없습니다.", "color": "#64748b"}
-
-    # 14. Parabolic SAR
-    if 'PSAR' in latest and not np.isnan(latest['PSAR']):
-        psar = latest['PSAR']
-        if close > psar:
-            signals["parabolic_sar"] = {"status": "상승 추세 (SAR 아래)", "message": "SAR 점이 주가 아래에 위치하여 상승 추세를 지지합니다.", "color": "#10b981"}
-        else:
-            signals["parabolic_sar"] = {"status": "하락 추세 (SAR 위)", "message": "SAR 점이 주가 위에 위치하여 하락 압력이 존재합니다.", "color": "#ef4444"}
-    else:
-        signals["parabolic_sar"] = {"status": "계산 불가", "message": "데이터 부족으로 SAR을 계산할 수 없습니다.", "color": "#64748b"}
-
-    # 15. VWAP
-    if 'VWAP' in latest and not np.isnan(latest['VWAP']):
-        vwap = latest['VWAP']
-        if close > vwap:
-            signals["vwap"] = {"status": "VWAP 상회 (매수 우위)", "message": "주가가 거래량가중평균가 위에 있어 기관 매수 우위 구간입니다.", "color": "#10b981"}
-        else:
-            signals["vwap"] = {"status": "VWAP 하회 (매도 우위)", "message": "주가가 거래량가중평균가 아래에 있어 매도 압력이 우세합니다.", "color": "#ef4444"}
-    else:
-        signals["vwap"] = {"status": "데이터 없음", "message": "거래량 데이터가 없어 VWAP을 계산할 수 없습니다.", "color": "#64748b"}
 
     return signals
