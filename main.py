@@ -221,13 +221,6 @@ trend_result = analyze_trend(df)
 col_kp1, col_kp2, col_kp3, col_kp4 = st.columns(4)
 
 with col_kp1:
-    st.markdown(f"""
-    <div class='metric-card'>
-        <div class='metric-title'>분석 대상 종목</div>
-        <div class='metric-value' style='color: #818cf8; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>{info['name']}</div>
-        <div class='metric-sub' style='color: #64748b;'>{ticker_input} ({'KRX' if is_kr else 'US'})</div>
-    </div>
-    """, unsafe_allow_html=True)
 
     is_favorite = False
     fav_key = None
