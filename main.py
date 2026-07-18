@@ -104,8 +104,41 @@ with st.sidebar:
     market = st.selectbox("시장 (Market)", ["KR (한국)", "US (미국)"], index=0)
     is_kr = market.startswith("KR")
     
-    default_ticker = "000660" if is_kr else "AAPL"
-    ticker_input = st.text_input("종목 코드 (Ticker)", value=default_ticker).strip().upper()
+    # 시장별 즐겨찾기 목록 구성
+    if is_kr:
+        FAVORITES = {
+            "🌟 직접 입력": "",
+            "삼성전자": "005930",
+            "SK하이닉스": "000660",
+            "현대차": "005380",
+            "카카오": "035720",
+            "NAVER": "035420",
+            "에코프로비엠": "247540",
+            "셀트리온": "068270"
+        }
+        default_index = 2 # SK하이닉스
+    else:
+        FAVORITES = {
+            "🌟 직접 입력": "",
+            "애플 (AAPL)": "AAPL",
+            "테슬라 (TSLA)": "TSLA",
+            "엔비디아 (NVDA)": "NVDA",
+            "마이크로소프트 (MSFT)": "MSFT",
+            "알파벳 (GOOGL)": "GOOGL",
+            "아마존 (AMZN)": "AMZN",
+            "메타 (META)": "META",
+            "비트코인 (BTC-USD)": "BTC-USD"
+        }
+        default_index = 1 # 애플
+    
+    fav_selection = st.selectbox("⭐ 즐겨찾기 종목", list(FAVORITES.keys()), index=default_index)
+    
+    if fav_selection == "🌟 직접 입력":
+        default_ticker = "000660" if is_kr else "AAPL"
+        ticker_input = st.text_input("종목 코드 (Ticker) 직접 입력", value=default_ticker).strip().upper()
+    else:
+        ticker_input = FAVORITES[fav_selection]
+        st.text_input("선택된 종목 코드", value=ticker_input, disabled=True)
     
     period_options = {"3개월": 90, "6개월": 180, "1년": 365, "3년": 1095}
     selected_period = st.selectbox("조회 기간", list(period_options.keys()), index=1)
@@ -175,13 +208,13 @@ with col_kp3:
     """, unsafe_allow_html=True)
     
 with col_kp4:
-    rsi_val = latest['RSI']
-    rsi_color = "#10b981" if rsi_val <= 30 else ("#ef4444" if rsi_val >= 70 else "#e2e8f0")
+    macd_hist_val = latest['MACD_Hist']
+    macd_color = "#10b981" if macd_hist_val >= 0 else "#ef4444"
     st.markdown(f"""
     <div class='metric-card'>
-        <div class='metric-title'>현재 RSI (14)</div>
-        <div class='metric-value' style='color: {rsi_color};'>{rsi_val:.1f}</div>
-        <div class='metric-sub' style='color: #64748b;'>과매수(>70) / 과매도(<30)</div>
+        <div class='metric-title'>MACD 오실레이터</div>
+        <div class='metric-value' style='color: {macd_color};'>{macd_hist_val:+.2f}</div>
+        <div class='metric-sub' style='color: #64748b;'>상승 모멘텀(>0) / 하락 모멘텀(<0)</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -337,7 +370,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ----------------- DETAILED METRICS TABLE -----------------
 st.markdown("### 📋 최근 5일 기술적 지표 상세 내역")
-recent_df = df.tail(5)[['Date', 'Close', 'SMA_20', 'SMA_50', 'MACD', 'MACD_Signal', 'RSI', 'BB_Lower', 'BB_Upper']]
+recent_df = df.tail(5)[['Date', 'Close', 'SMA_20', 'SMA_50', 'MACD', 'MACD_Signal', 'MACD_Hist']]
 recent_df['Date'] = pd.to_datetime(recent_df['Date']).dt.strftime('%Y-%m-%d')
 recent_df = recent_df.sort_values(by='Date', ascending=False).reset_index(drop=True)
 
@@ -348,12 +381,14 @@ format_dict = {
     'SMA_50': '{:,.2f}',
     'MACD': '{:.3f}',
     'MACD_Signal': '{:.3f}',
-    'RSI': '{:.1f}',
-    'BB_Lower': '{:,.2f}',
-    'BB_Upper': '{:,.2f}'
+    'MACD_Hist': '{:.3f}'
 }
 
-st.dataframe(recent_df.style.format(format_dict), use_container_width=True)
+st.dataframe(
+    recent_df.style.format(format_dict).applymap(
+        lambda x: 'color: #ef4444' if isinstance(x, (int, float)) and x < 0 else ('color: #10b981' if isinstance(x, (int, float)) and x > 0 else ''),
+        subset=['MACD_Hist']
+    ), use_container_width=True)
 
 # ----------------- BACKTEST SIMULATOR -----------------
 st.markdown("---")
