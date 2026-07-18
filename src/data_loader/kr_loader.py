@@ -18,21 +18,7 @@ def get_kr_assets():
 _KRX_LISTING_CACHE = None
 
 def get_kr_stock_name(ticker: str) -> str:
-    """Gets the Korean stock name dynamically using yfinance to avoid KRX IP blocking on cloud."""
-    try:
-        import yfinance as yf
-        # Try KOSPI first (.KS)
-        info = yf.Ticker(f"{ticker}.KS").info
-        if 'shortName' in info and info['shortName']:
-            return info['shortName']
-            
-        # Try KOSDAQ next (.KQ)
-        info = yf.Ticker(f"{ticker}.KQ").info
-        if 'shortName' in info and info['shortName']:
-            return info['shortName']
-    except Exception:
-        pass
-        
+    """Returns a simple formatted string to completely avoid external network hangs."""
     return f"한국 종목 ({ticker})"
 
 def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:

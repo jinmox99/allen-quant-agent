@@ -53,27 +53,20 @@ def get_us_stock_info(ticker: str) -> dict:
     Returns metadata and current price information for a US asset.
     """
     try:
-        yt = yf.Ticker(ticker)
-        # Fast extraction of current price and basic info
-        info = yt.info
-        asset_name = US_ASSETS.get(ticker, info.get('longName') or info.get('shortName') or ticker)
-        current_price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('navPrice')
+        asset_name = US_ASSETS.get(ticker, f"미국 종목 ({ticker})")
         
-        # Fallback if info is empty or slow
-        if current_price is None:
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
-            df = get_us_stock_data(ticker, start_date, end_date)
-            if not df.empty:
-                current_price = float(df.iloc[-1]['Close'])
-                prev_close = float(df.iloc[-2]['Close']) if len(df) > 1 else current_price
-                change_percent = ((current_price - prev_close) / prev_close) * 100
-            else:
-                current_price = 0.0
-                change_percent = 0.0
-        else:
-            prev_close = info.get('previousClose') or current_price
+        # Fallback to fetching recent data directly to avoid .info hangs
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+        df = get_us_stock_data(ticker, start_date, end_date)
+        
+        if not df.empty:
+            current_price = float(df.iloc[-1]['Close'])
+            prev_close = float(df.iloc[-2]['Close']) if len(df) > 1 else current_price
             change_percent = ((current_price - prev_close) / prev_close) * 100
+        else:
+            current_price = 0.0
+            change_percent = 0.0
             
         return {
             'ticker': ticker,
@@ -86,7 +79,7 @@ def get_us_stock_info(ticker: str) -> dict:
         print(f"Error fetching US info for ticker {ticker}: {str(e)}")
         return {
             'ticker': ticker,
-            'name': asset_name,
+            'name': ticker,
             'current_price': 0.0,
             'change_percent': 0.0,
             'last_updated': "N/A"
