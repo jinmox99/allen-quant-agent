@@ -93,42 +93,7 @@ st.markdown("""
         gap: 20px;
     }
     
-    /* Star Button Customization */
-    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) {
-        position: relative;
-    }
-    /* Hide the button's parent container to prevent empty space at the bottom */
-    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) > div > div:nth-child(n+2) {
-        height: 0px !important;
-        min-height: 0px !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: visible !important;
-    }
-    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) button {
-        position: absolute !important;
-        top: 20px !important;
-        right: 20px !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: #facc15 !important;
-        font-size: 28px !important;
-        padding: 0 !important;
-        width: auto !important;
-        min-height: 0 !important;
-        height: auto !important;
-        line-height: 1 !important;
-        z-index: 999 !important;
-    }
-    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) button:hover {
-        transform: scale(1.15);
-        background: transparent !important;
-    }
-    div[data-testid="stHorizontalBlock"]:nth-of-type(1) > div[data-testid="column"]:nth-of-type(1) button:focus {
-        background: transparent !important;
-        color: #facc15 !important;
-    }
+    /* We removed fragile CSS selectors for the star button. Javascript will handle it reliably. */
 </style>
 """, unsafe_allow_html=True)
 
@@ -250,6 +215,37 @@ with col_kp1:
             user_favorites[market_key][info['name']] = ticker_input
         save_favorites(user_favorites)
         st.rerun()
+
+    # JS hack to style the button perfectly regardless of Streamlit DOM changes
+    st.markdown("""
+    <img src="x" onerror="
+        const buttons = window.document.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.innerText.includes('⭐') || btn.innerText.includes('☆')) {
+                btn.style.position = 'absolute';
+                btn.style.top = '15px';
+                btn.style.right = '15px';
+                btn.style.background = 'transparent';
+                btn.style.border = 'none';
+                btn.style.boxShadow = 'none';
+                btn.style.color = '#facc15';
+                btn.style.fontSize = '26px';
+                btn.style.zIndex = '999';
+                btn.style.padding = '0';
+                
+                const col = btn.closest('div[data-testid=\\'column\\']');
+                if(col) col.style.position = 'relative';
+                
+                const cont = btn.closest('div.element-container');
+                if(cont) { 
+                    cont.style.height = '0px'; 
+                    cont.style.minHeight = '0px'; 
+                    cont.style.margin = '0px';
+                }
+            }
+        });
+    " style="display:none;">
+    """, unsafe_allow_html=True)
     
 with col_kp2:
     st.markdown(f"""
