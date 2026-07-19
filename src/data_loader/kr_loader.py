@@ -14,6 +14,69 @@ def get_kr_assets():
     """Returns the dictionary of predefined Korean assets."""
     return KR_ASSETS
 
+def get_kr_top_50():
+    """Returns the top 50 Korean stocks by market capitalization using fdr.StockListing('KRX').
+       Excludes preferred stocks (usually ending in '우', '우B', etc.)."""
+    try:
+        df = fdr.StockListing('KRX')
+        if 'Marcap' in df.columns:
+            # Sort by Marcap descending
+            df = df.sort_values(by='Marcap', ascending=False)
+            
+            # Filter out preferred stocks
+            # Usually preferred stock names contain '우' or ends with '우B' etc., 
+            # or ISU_CD has 'K' indicating preferred sometimes, but let's just filter names ending with '우' or '우B', '우C' etc.
+            df = df[~df['Name'].str.contains(r'우[A-Z]?$|우\([A-Z0-9]+\)$', regex=True)]
+            
+            top50 = df.head(50)
+            
+            # Return list of dicts with ticker and name
+            result = []
+            for _, row in top50.iterrows():
+                result.append({
+                    'ticker': str(row['Code']),
+                    'name': str(row['Name']),
+                    'marcap': int(row['Marcap'])
+                })
+            return result
+    except Exception as e:
+        print(f"Error fetching KR top 50: {e}")
+    
+    # Fallback to predefined if fails
+    return [{'ticker': k, 'name': v, 'marcap': 0} for k, v in KR_ASSETS.items()]
+
+def get_kr_etfs_all():
+    """Returns all Korean ETFs by market capitalization using fdr.StockListing('ETF/KR')."""
+    try:
+        df = fdr.StockListing('ETF/KR')
+        # ETF/KR may not have Marcap, but it might have Amount or Volume.
+        # It's known that FDR ETF/KR sometimes lacks Marcap, so we sort by Volume if MarCap doesn't exist.
+        if 'Marcap' in df.columns or 'MarCap' in df.columns:
+            marcap_col = 'MarCap' if 'MarCap' in df.columns else 'Marcap'
+            df = df.sort_values(by=marcap_col, ascending=False)
+        elif 'Volume' in df.columns:
+            df = df.sort_values(by='Volume', ascending=False)
+            
+        # Filter for Domestic Market Index (1) and Sector/Theme (2)
+        # Category values can be strings or ints, depending on fdr updates
+        df = df[df['Category'].astype(str).isin(['1', '2'])]
+        
+        # Exclude Leverage and Inverse ETFs
+        df = df[~df['Name'].str.contains(r'레버리지|인버스', regex=True)]
+        
+        result = []
+        for _, row in df.iterrows():
+            result.append({
+                'ticker': str(row['Symbol']),
+                'name': str(row['Name']),
+                'marcap': int(row.get('MarCap', row.get('Marcap', 0))) if 'MarCap' in df.columns or 'Marcap' in df.columns else 0
+            })
+        return result
+    except Exception as e:
+        print(f"Error fetching KR ETF list: {e}")
+    
+    return []
+
 # Global cache for KRX stock listing to avoid fetching multiple times
 _KRX_LISTING_CACHE = None
 
