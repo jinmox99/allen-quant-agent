@@ -197,6 +197,7 @@ if df.empty or len(df) < 20:
 # ----------------- INDICATOR CALCULATION -----------------
 # Calculate indicators on the full fetched dataset (with extra lookback)
 df = add_all_indicators(df)
+full_df = df.copy()
 
 # Slice the DataFrame to the user-selected period (for rendering and backtesting)
 df['Date_parsed'] = pd.to_datetime(df['Date'])
@@ -272,21 +273,16 @@ with col_kp4:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- INDICATOR CALCULATION -----------------
-df = add_all_indicators(df)
-latest = df.iloc[-1]
-trend_result = analyze_trend(df)
-
-# Run backtests to get last trade info
-backtest_results = run_indicator_backtests(df)
+# Run backtests on the full historical dataset to get absolute last trade signals
+absolute_backtest_results = run_indicator_backtests(full_df)
 
 trade_info_map = {}
 for key, name in [('sma', '이동평균선 (SMA)'), ('macd', 'MACD'), 
                   ('quant_momentum', '💎 퀀트 모멘텀 (알파 추구형)'), 
                   ('ema_cross', '💎 ⚡ 골든크로스 EMA (5/20)'), 
                   ('dual_momentum', '💎 🛡️ 듀얼 모멘텀')]:
-    if backtest_results and name in backtest_results and backtest_results[name]['trades']:
-        last_trade = backtest_results[name]['trades'][-1]
+    if absolute_backtest_results and name in absolute_backtest_results and absolute_backtest_results[name]['trades']:
+        last_trade = absolute_backtest_results[name]['trades'][-1]
         trade_price = last_trade['Price']
         curr_price = float(latest['Close'])
         pct_change = (curr_price - trade_price) / trade_price * 100
@@ -388,35 +384,38 @@ for idx, (name, strategy_display_name) in enumerate([
     ("💎 ⚡ 골든크로스 EMA (5/20)", "EMA교차"),
     ("💎 🛡️ 듀얼 모멘텀", "듀얼모멘텀")
 ]):
-    if backtest_results and name in backtest_results and backtest_results[name]['trades']:
-        last_trade = backtest_results[name]['trades'][-1]
-        action = last_trade['Action']
-        price = last_trade['Price']
+    if absolute_backtest_results and name in absolute_backtest_results and absolute_backtest_results[name]['trades']:
+        last_trade = absolute_backtest_results[name]['trades'][-1]
         date = last_trade['Date']
-        color = "#10b981" if action == "BUY" else "#ef4444"
-        text_action = "매수" if action == "BUY" else "매도"
         
-        # Stagger vertical offsets to prevent label overlap
-        offset = -30 - (idx * 22) if action == "BUY" else 30 + (idx * 22)
-        
-        fig.add_annotation(
-            x=date,
-            y=price,
-            text=f"{strategy_display_name}: {text_action}",
-            showarrow=True,
-            arrowhead=2,
-            arrowcolor=color,
-            arrowsize=1,
-            arrowwidth=1.5,
-            ax=0,
-            ay=offset,
-            bgcolor="rgba(13, 15, 20, 0.85)",
-            bordercolor=color,
-            borderwidth=1.5,
-            borderpad=4,
-            font=dict(color=color, size=9),
-            opacity=0.95
-        )
+        # Only annotate if the trade happened within the visible chart period
+        if date >= start_date:
+            action = last_trade['Action']
+            price = last_trade['Price']
+            color = "#10b981" if action == "BUY" else "#ef4444"
+            text_action = "매수" if action == "BUY" else "매도"
+            
+            # Stagger vertical offsets to prevent label overlap
+            offset = -30 - (idx * 22) if action == "BUY" else 30 + (idx * 22)
+            
+            fig.add_annotation(
+                x=date,
+                y=price,
+                text=f"{strategy_display_name}: {text_action}",
+                showarrow=True,
+                arrowhead=2,
+                arrowcolor=color,
+                arrowsize=1,
+                arrowwidth=1.5,
+                ax=0,
+                ay=offset,
+                bgcolor="rgba(13, 15, 20, 0.85)",
+                bordercolor=color,
+                borderwidth=1.5,
+                borderpad=4,
+                font=dict(color=color, size=9),
+                opacity=0.95
+            )
 
 fig.update_layout(
     title=dict(text="📊 주가 추세 및 이동평균선 (SMA 20/50/120)", font=dict(size=16, color="#94a3b8")),
@@ -431,27 +430,7 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ----------------- DETAILED METRICS TABLE -----------------
-st.markdown("### 📋 최근 5일 기술적 지표 상세 내역")
-recent_df = df.tail(5)[['Date', 'Close', 'SMA_20', 'SMA_50', 'MACD', 'MACD_Signal', 'MACD_Hist']]
-recent_df['Date'] = pd.to_datetime(recent_df['Date']).dt.strftime('%Y-%m-%d')
-recent_df = recent_df.sort_values(by='Date', ascending=False).reset_index(drop=True)
 
-# Format numerical columns
-format_dict = {
-    'Close': '{:,.2f}' if not is_kr else '{:,.0f}',
-    'SMA_20': '{:,.2f}',
-    'SMA_50': '{:,.2f}',
-    'MACD': '{:.3f}',
-    'MACD_Signal': '{:.3f}',
-    'MACD_Hist': '{:.3f}'
-}
-
-st.dataframe(
-    recent_df.style.format(format_dict).map(
-        lambda x: 'color: #ef4444' if isinstance(x, (int, float)) and x < 0 else ('color: #10b981' if isinstance(x, (int, float)) and x > 0 else ''),
-        subset=['MACD_Hist']
-    ), use_container_width=True)
 
 # ----------------- BACKTEST SIMULATOR -----------------
 st.markdown("---")
