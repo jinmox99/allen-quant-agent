@@ -146,6 +146,13 @@ user_favorites = load_favorites()
 with st.sidebar:
     st.header("🔍 종목 검색")
     
+    try:
+        import requests
+        external_ip = requests.get('https://api.ipify.org', timeout=2).text
+        st.caption(f"🌍 현재 외부 IP: `{external_ip}`")
+    except:
+        pass
+    
     # 데이터프레임 행 선택 감지 및 상태 동기화 (오류 방지를 위해 렌더링 전 최상단에서 처리)
     for mk in ["KR", "US", "KR_ETF", "US_ETF"]:
         df_key = f"ranking_table_{mk}"
