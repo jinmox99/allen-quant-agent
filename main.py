@@ -212,6 +212,15 @@ with st.sidebar:
     st.markdown("💡 **Tip:**\n- 한국 종목은 `000660`(SK하이닉스), `005930`(삼성전자) 등의 숫자를 입력하세요.\n- 미국 종목은 `AAPL`, `TSLA`, `NVDA` 등 영문 티커를 입력하세요.")
 
 with tab1:
+    col_t1, col_t2 = st.columns([0.88, 0.12])
+    with col_t2:
+        if st.button("🔄 새로고침", help="최신 시세로 다시 불러오기"):
+            get_kr_stock_data.clear()
+            get_kr_stock_info.clear()
+            get_us_stock_data.clear()
+            get_us_stock_info.clear()
+            st.rerun()
+
 # ----------------- DATA FETCHING (TAB 1) -----------------
     if not ticker_input:
         st.warning("👈 왼쪽 사이드바에서 분석할 종목 코드를 입력해주세요.")
