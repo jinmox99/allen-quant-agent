@@ -133,7 +133,7 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None,
         end_date = datetime.now().strftime('%Y-%m-%d')
         
     try:
-        # If the ticker is already a global index (like ^KS200, ^KS11), download directly
+        # 만약 fdr이 실패했거나 (IP 차단 등) 글로벌 인덱스인 경우 yfinance 폴백
         if ticker.startswith("^"):
             df = yf.download(ticker, start=start_date, end=end_date, progress=False)
         else:
@@ -143,6 +143,24 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None,
             if df.empty:
                 df = yf.download(f"{ticker}.KQ", start=start_date, end=end_date, progress=False)
             
+        # 야후 파이낸스는 일부 ETN/ETF에 대해 과거 데이터를 제공하지 않아 20일치 미만일 수 있음. 
+        # 이 경우 FinanceDataReader를 이용해 네이버 금융에서 데이터를 가져옴.
+        if (df.empty or len(df) < 20) and not ticker.startswith("^"):
+            print(f"yfinance data too short or empty for {ticker}, falling back to fdr")
+            try:
+                import FinanceDataReader as fdr
+                df_fdr = fdr.DataReader(ticker, start=start_date, end=end_date)
+                if not df_fdr.empty:
+                    df_fdr = df_fdr.reset_index()
+                    if 'index' in df_fdr.columns:
+                        df_fdr.rename(columns={'index': 'Date'}, inplace=True)
+                    if 'Close' in df_fdr.columns:
+                        df_fdr = df_fdr.dropna(subset=['Close'])
+                    if len(df_fdr) >= 20:
+                        return df_fdr
+            except Exception as fdr_e:
+                print(f"fdr fallback failed: {fdr_e}")
+
         if df.empty:
             raise ValueError(f"No data returned for KR ticker: {ticker}")
             
@@ -157,6 +175,7 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None,
         # Drop rows with NaN Close values
         if 'Close' in df.columns:
             df = df.dropna(subset=['Close'])
+            
         return df
     except Exception as e:
         print(f"Error fetching data for KR ticker {ticker}: {str(e)}")
