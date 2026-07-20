@@ -15,7 +15,7 @@ import sys
 # Add the src directory to sys.path to avoid Streamlit Cloud's /mount/src module collision
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
 
-from data_loader.kr_loader import get_kr_stock_data, get_kr_stock_info, get_krx_cache_key
+from data_loader.toss_loader import get_toss_stock_data as get_kr_stock_data, get_toss_stock_info as get_kr_stock_info, get_toss_cache_key as get_krx_cache_key
 from data_loader.us_loader import get_us_stock_data, get_us_stock_info, get_us_cache_key
 from analyzers.indicators import add_all_indicators
 from analyzers.trend import analyze_trend
