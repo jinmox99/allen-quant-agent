@@ -16,7 +16,7 @@ def get_toss_token() -> str:
     Toss Invest API OAuth 2.0 액세스 토큰을 발급받습니다.
     """
     client_id = os.getenv("TOSS_ID")
-    client_secret = os.getenv("TOS__SECRET") # Note the typo in .env variable name
+    client_secret = os.getenv("TOSS_SECRET")
     
     if not client_id or not client_secret:
         return None
