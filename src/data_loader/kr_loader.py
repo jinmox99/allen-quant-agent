@@ -112,18 +112,9 @@ def get_krx_cache_key() -> str:
     try:
         tz = pytz.timezone('Asia/Seoul')
         now = datetime.now(tz)
-        is_weekday = now.weekday() < 5
-        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
-        is_market_active = is_weekday and (market_open <= now <= market_close)
-        
-        if is_market_active:
-            # Round to nearest 5 minutes
-            minute_round = (now.minute // 5) * 5
-            return f"active_{now.strftime('%Y-%m-%d')}_{now.hour:02d}_{minute_round:02d}"
-        else:
-            # Round to nearest hour
-            return f"closed_{now.strftime('%Y-%m-%d')}_{now.hour:02d}"
+        # yfinance does not provide intraday real-time updates for KR stocks,
+        # so caching on an hourly basis is sufficient to reduce API calls.
+        return f"krx_{now.strftime('%Y-%m-%d')}_{now.hour:02d}"
     except Exception:
         now = datetime.now()
         return f"fallback_{now.strftime('%Y-%m-%d')}_{now.hour:02d}"
