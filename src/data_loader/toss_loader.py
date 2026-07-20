@@ -50,7 +50,26 @@ def get_toss_cache_key():
 def get_toss_stock_data(ticker: str, start_date: str = "", end_date: str = "", cache_key: str = "") -> pd.DataFrame:
     """
     Toss API를 통해 과거 일봉(Candle) 데이터를 가져옵니다.
+    먼저 data/toss/ 폴더에 정적 파일이 있는지 확인합니다.
     """
+    # 1. 정적 파일 캐시 확인 (클라우드 환경 대응용)
+    import json
+    static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}.csv')
+    if os.path.exists(static_file):
+        try:
+            df = pd.read_csv(static_file)
+            df['Date'] = pd.to_datetime(df['Date'])
+            
+            if start_date:
+                start = pd.to_datetime(start_date)
+                df = df[df['Date'] >= start]
+            if end_date:
+                end = pd.to_datetime(end_date)
+                df = df[df['Date'] <= end]
+                
+            return df.reset_index(drop=True)
+        except Exception as e:
+            print(f"Failed to load static data for {ticker}: {e}")
     token = get_toss_token()
     if not token:
         print(f"Toss token not available, falling back to kr_loader for {ticker}")
@@ -129,7 +148,18 @@ def get_toss_stock_data(ticker: str, start_date: str = "", end_date: str = "", c
 def get_toss_stock_info(ticker: str, cache_key: str = "") -> dict:
     """
     Toss API를 통해 실시간 현재가와 메타데이터를 가져옵니다.
+    먼저 data/toss/ 폴더에 정적 파일이 있는지 확인합니다.
     """
+    # 1. 정적 파일 캐시 확인 (클라우드 환경 대응용)
+    import json
+    static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}_info.json')
+    if os.path.exists(static_file):
+        try:
+            with open(static_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Failed to load static info for {ticker}: {e}")
+            
     asset_name = KR_ASSETS.get(ticker, get_kr_stock_name(ticker))
     
     current_price = 0.0
