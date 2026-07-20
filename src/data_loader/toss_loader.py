@@ -19,7 +19,7 @@ def get_toss_token() -> str:
     client_secret = os.getenv("TOS__SECRET") # Note the typo in .env variable name
     
     if not client_id or not client_secret:
-        raise ValueError("TOSS_ID or TOS__SECRET environment variables are missing.")
+        return None
         
     url = "https://openapi.tossinvest.com/oauth2/token"
     data = {
@@ -28,11 +28,16 @@ def get_toss_token() -> str:
         "client_secret": client_secret
     }
     
-    res = requests.post(url, data=data)
-    if res.status_code == 200:
-        return res.json().get("access_token")
-    else:
-        raise Exception(f"Failed to fetch Toss token: {res.status_code} - {res.text}")
+    try:
+        res = requests.post(url, data=data, timeout=3)
+        if res.status_code == 200:
+            return res.json().get("access_token")
+        else:
+            print(f"Failed to fetch Toss token: {res.status_code} - {res.text}")
+            return None
+    except Exception as e:
+        print(f"Exception fetching Toss token: {e}")
+        return None
 
 def get_toss_cache_key():
     """
@@ -47,6 +52,10 @@ def get_toss_stock_data(ticker: str, start_date: str = "", end_date: str = "", c
     Toss API를 통해 과거 일봉(Candle) 데이터를 가져옵니다.
     """
     token = get_toss_token()
+    if not token:
+        print(f"Toss token not available, falling back to kr_loader for {ticker}")
+        from data_loader.kr_loader import get_kr_stock_data
+        return get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
     
     # 글로벌 인덱스(^)는 야후 파이낸스 폴백 사용
     if ticker.startswith("^"):
@@ -72,12 +81,18 @@ def get_toss_stock_data(ticker: str, start_date: str = "", end_date: str = "", c
         "Authorization": f"Bearer {token}"
     }
     
-    res = requests.get(url, headers=headers)
-    if res.status_code != 200:
-        print(f"Failed to fetch Toss candles for {symbol}: {res.status_code} - {res.text}")
-        return pd.DataFrame()
-        
-    data = res.json()
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code != 200:
+            print(f"Failed to fetch Toss candles for {symbol}: {res.status_code} - {res.text}")
+            from data_loader.kr_loader import get_kr_stock_data
+            return get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
+            
+        data = res.json()
+    except Exception as e:
+        print(f"Exception fetching Toss candles for {symbol}: {e}")
+        from data_loader.kr_loader import get_kr_stock_data
+        return get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
     candles = data.get("result", {}).get("candles", [])
     
     if not candles:
@@ -129,12 +144,17 @@ def get_toss_stock_info(ticker: str, cache_key: str = "") -> dict:
         
     try:
         token = get_toss_token()
+        if not token:
+            print(f"Toss token not available, falling back to kr_loader for {ticker}")
+            from data_loader.kr_loader import get_kr_stock_info
+            return get_kr_stock_info(ticker, cache_key=cache_key)
+            
         url = f"https://openapi.tossinvest.com/api/v1/prices?symbols={ticker}"
         headers = {
             "Authorization": f"Bearer {token}"
         }
         
-        res = requests.get(url, headers=headers)
+        res = requests.get(url, headers=headers, timeout=3)
         if res.status_code == 200:
             data = res.json()
             prices = data.get("result", [])
@@ -145,31 +165,28 @@ def get_toss_stock_info(ticker: str, cache_key: str = "") -> dict:
                 
                 # Fetch historical data to calculate daily change
                 df = get_toss_stock_data(ticker)
-                if len(df) > 1:
+                if not df.empty and len(df) > 1:
                     # Find previous day's close
-                    # If today's data is already the last row, prev is the second to last
-                    # Since we don't know if current_price is already in df, we just take the last closed day
-                    # Toss candles returns today as the last row if market is open/closed today
                     latest_date = df.iloc[-1]['Date'].date()
                     if latest_date == datetime.now().date():
                         prev = float(df.iloc[-2]['Close'])
                     else:
                         prev = float(df.iloc[-1]['Close'])
                     daily_change = ((current_price - prev) / prev) * 100
+        else:
+            print(f"Toss API returned {res.status_code} for prices. Falling back to kr_loader.")
+            from data_loader.kr_loader import get_kr_stock_info
+            return get_kr_stock_info(ticker, cache_key=cache_key)
                     
     except Exception as e:
-        print(f"Failed to fetch Toss info for {ticker}: {e}")
+        print(f"Failed to fetch Toss info for {ticker}: {e}. Falling back to kr_loader.")
+        from data_loader.kr_loader import get_kr_stock_info
+        return get_kr_stock_info(ticker, cache_key=cache_key)
         
-    # If Toss fails, fallback to Toss Historical (just in case) or kr_loader logic
+    # If Toss parsing failed but didn't throw, fallback to kr_loader logic
     if current_price == 0.0:
-        df = get_toss_stock_data(ticker)
-        if not df.empty:
-            latest = df.iloc[-1]
-            current_price = float(latest['Close'])
-            if len(df) > 1:
-                prev = float(df.iloc[-2]['Close'])
-                daily_change = ((current_price - prev) / prev) * 100
-            last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        from data_loader.kr_loader import get_kr_stock_info
+        return get_kr_stock_info(ticker, cache_key=cache_key)
 
     return {
         'ticker': ticker,
