@@ -142,7 +142,21 @@ def get_kr_stock_data(ticker: str, start_date: str = None, end_date: str = None,
         end_date = datetime.now().strftime('%Y-%m-%d')
         
     try:
-        # If the ticker is already a global index (like ^KS200, ^KS11), download directly
+        # 우선 실시간 조회가 가능한 FinanceDataReader (네이버 파이낸스) 시도
+        if not ticker.startswith("^"):
+            try:
+                df = fdr.DataReader(ticker, start=start_date, end=end_date)
+                if not df.empty:
+                    df = df.reset_index()
+                    if 'index' in df.columns:
+                        df.rename(columns={'index': 'Date'}, inplace=True)
+                    if 'Close' in df.columns:
+                        df = df.dropna(subset=['Close'])
+                    return df
+            except Exception as e:
+                print(f"fdr.DataReader failed for {ticker}: {e}. Falling back to yfinance.")
+
+        # 만약 fdr이 실패했거나 (IP 차단 등) 글로벌 인덱스인 경우 yfinance 폴백
         if ticker.startswith("^"):
             df = yf.download(ticker, start=start_date, end=end_date, progress=False)
         else:
