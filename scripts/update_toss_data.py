@@ -35,12 +35,17 @@ def main():
     with open(fav_file, 'r', encoding='utf-8') as f:
         favorites = json.load(f)
         
+        
     kr_tickers = list(favorites.get('KR', {}).values())
-    if not kr_tickers:
-        print("No KR tickers found in favorites.")
+    us_tickers = list(favorites.get('US', {}).values())
+    
+    all_tickers = kr_tickers + us_tickers
+    
+    if not all_tickers:
+        print("No tickers found in favorites.")
         return
         
-    for ticker in kr_tickers:
+    for ticker in all_tickers:
         print(f"Updating data for {ticker}...")
         
         # Global index skip
@@ -82,7 +87,7 @@ def main():
                 else:
                     daily_change = 0.0
                     
-                asset_name = KR_ASSETS.get(ticker, get_kr_stock_name(ticker))
+                asset_name = KR_ASSETS.get(ticker, get_kr_stock_name(ticker)) if ticker in kr_tickers else ticker
                 
                 # Fetch Real-time price (optional, but good for accuracy)
                 price_url = f"https://openapi.tossinvest.com/api/v1/prices?symbols={ticker}"
@@ -107,6 +112,8 @@ def main():
                 with open(json_path, 'w', encoding='utf-8') as jf:
                     json.dump(info_data, jf, ensure_ascii=False, indent=2)
                 print(f"  -> Saved info to {json_path}")
+            else:
+                print(f"  -> No candles returned for {ticker}")
         else:
             print(f"  -> Failed to fetch candles: {res.status_code}")
 

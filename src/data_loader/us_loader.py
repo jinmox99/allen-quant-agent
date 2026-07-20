@@ -153,49 +153,96 @@ def get_us_cache_key() -> str:
 @st.cache_data(ttl=3600)
 def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None, cache_key: str = "") -> pd.DataFrame:
     """
-    Fetches historical OHLCV data for a US leveraged ETF ticker using yfinance.
-    
-    Parameters:
-    - ticker: str (e.g. 'TQQQ')
-    - start_date: str (YYYY-MM-DD)
-    - end_date: str (YYYY-MM-DD)
-    - cache_key: str (Optional key for caching logic)
-    
-    Returns:
-    - pd.DataFrame containing Date, Open, High, Low, Close, Volume, Adj Close
+    Fetches historical OHLCV data for a US ticker.
+    Tries Toss API first, then falls back to yfinance.
     """
     if start_date is None:
         start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
     if end_date is None:
         end_date = datetime.now().strftime('%Y-%m-%d')
         
-    try:
-        # yfinance can fetch directly
-        df = yf.download(ticker, start=start_date, end=end_date, progress=False)
-        if df.empty:
-            raise ValueError(f"No data returned for US ticker: {ticker}")
-        
-        # Flatten MultiIndex columns if present (e.g. from newer yfinance versions)
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.droplevel(1)
+    def fallback_to_yf():
+        import os
+        static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}.csv')
+        if os.path.exists(static_file):
+            try:
+                df = pd.read_csv(static_file)
+                df['Date'] = pd.to_datetime(df['Date'])
+                if start_date:
+                    start = pd.to_datetime(start_date)
+                    df = df[df['Date'] >= start]
+                if end_date:
+                    end = pd.to_datetime(end_date)
+                    df = df[df['Date'] <= end]
+                return df.reset_index(drop=True)
+            except Exception as e:
+                print(f"Failed to load static US data for {ticker}: {e}")
+                
+        try:
+            # yfinance can fetch directly
+            df = yf.download(ticker, start=start_date, end=end_date, progress=False)
+            if df.empty:
+                raise ValueError(f"No data returned for US ticker: {ticker}")
             
-        # Reset index to make Date a column
-        df = df.reset_index()
-        # Drop rows with NaN Close values
-        if 'Close' in df.columns:
-            df = df.dropna(subset=['Close'])
-        return df
+            # Flatten MultiIndex columns if present (e.g. from newer yfinance versions)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.droplevel(1)
+                
+            # Reset index to make Date a column
+            df = df.reset_index()
+            # Drop rows with NaN Close values
+            if 'Close' in df.columns:
+                df = df.dropna(subset=['Close'])
+            return df
+        except Exception as e:
+            print(f"Error fetching US data via yfinance for ticker {ticker}: {str(e)}")
+            return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
+
+    from data_loader.toss_loader import get_toss_token
+    token = get_toss_token()
+    if not token:
+        return fallback_to_yf()
+        
+    try:
+        import requests
+        url = f"https://openapi.tossinvest.com/api/v1/candles?symbol={ticker}&interval=1d&count=200"
+        res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            candles = data.get("result", {}).get("candles", [])
+            if candles:
+                df = pd.DataFrame(candles)
+                df['Date'] = pd.to_datetime(df['timestamp']).dt.tz_localize(None)
+                df['Open'] = pd.to_numeric(df['openPrice'])
+                df['High'] = pd.to_numeric(df['highPrice'])
+                df['Low'] = pd.to_numeric(df['lowPrice'])
+                df['Close'] = pd.to_numeric(df['closePrice'])
+                df['Volume'] = pd.to_numeric(df['volume'])
+                df = df.sort_values('Date').reset_index(drop=True)
+                df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
+                if start_date:
+                    start = pd.to_datetime(start_date)
+                    df = df[df['Date'] >= start]
+                if end_date:
+                    end = pd.to_datetime(end_date)
+                    df = df[df['Date'] <= end]
+                return df.reset_index(drop=True)
+            else:
+                return fallback_to_yf()
+        else:
+            print(f"Toss US data returned {res.status_code}. Falling back to yfinance.")
+            return fallback_to_yf()
     except Exception as e:
-        print(f"Error fetching US data for ticker {ticker}: {str(e)}")
-        return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
+        print(f"Failed Toss API for US {ticker}: {e}")
+        return fallback_to_yf()
 
 @st.cache_data(ttl=3600)
 def get_us_stock_info(ticker: str, cache_key: str = "") -> dict:
     """
     Returns metadata and current price information for a US asset.
+    Tries Toss API first, then falls back to Yahoo Search and yfinance.
     """
     try:
-        # Use Yahoo Search API to get name safely without .info hanging
         import requests
         asset_name = ticker
         if ticker in US_ASSETS:
@@ -214,28 +261,75 @@ def get_us_stock_info(ticker: str, cache_key: str = "") -> dict:
                                 break
             except Exception:
                 pass
-        
-        # Fetch recent price to extract current close and change
-        end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
-        
-        df = get_us_stock_data(ticker, start_date, end_date, cache_key=cache_key)
-        
-        if not df.empty:
-            current_price = float(df.iloc[-1]['Close'])
-            prev_close = float(df.iloc[-2]['Close']) if len(df) > 1 else current_price
-            change_percent = ((current_price - prev_close) / prev_close) * 100
-        else:
-            current_price = 0.0
-            change_percent = 0.0
+                
+        def fallback_to_yf():
+            import os
+            import json
+            static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}_info.json')
+            if os.path.exists(static_file):
+                try:
+                    with open(static_file, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except Exception as e:
+                    print(f"Failed to load static US info for {ticker}: {e}")
+                    
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+            df = get_us_stock_data(ticker, start_date, end_date, cache_key=cache_key)
+            if not df.empty:
+                current_price = float(df.iloc[-1]['Close'])
+                prev_close = float(df.iloc[-2]['Close']) if len(df) > 1 else current_price
+                change_percent = ((current_price - prev_close) / prev_close) * 100
+            else:
+                current_price = 0.0
+                change_percent = 0.0
+            return {
+                'ticker': ticker,
+                'name': asset_name,
+                'current_price': current_price,
+                'change_percent': change_percent,
+                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
             
-        return {
-            'ticker': ticker,
-            'name': asset_name,
-            'current_price': current_price,
-            'change_percent': change_percent,
-            'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
+        from data_loader.toss_loader import get_toss_token
+        token = get_toss_token()
+        if not token:
+            return fallback_to_yf()
+            
+        url = f"https://openapi.tossinvest.com/api/v1/prices?symbols={ticker}"
+        headers = {"Authorization": f"Bearer {token}"}
+        res = requests.get(url, headers=headers, timeout=3)
+        
+        if res.status_code == 200:
+            data = res.json()
+            prices = data.get("result", [])
+            if prices:
+                item = prices[0]
+                current_price = float(item.get("lastPrice", 0))
+                last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                df = get_us_stock_data(ticker)
+                daily_change = 0.0
+                if not df.empty and len(df) > 1:
+                    latest_date = df.iloc[-1]['Date'].date()
+                    if latest_date == datetime.now().date():
+                        prev = float(df.iloc[-2]['Close'])
+                    else:
+                        prev = float(df.iloc[-1]['Close'])
+                    daily_change = ((current_price - prev) / prev) * 100
+                    
+                return {
+                    'ticker': ticker,
+                    'name': asset_name,
+                    'current_price': current_price,
+                    'change_percent': daily_change,
+                    'last_updated': last_updated
+                }
+            else:
+                return fallback_to_yf()
+        else:
+            return fallback_to_yf()
+            
     except Exception as e:
         print(f"Error fetching US info for ticker {ticker}: {str(e)}")
         return {
