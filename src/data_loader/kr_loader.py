@@ -189,29 +189,48 @@ def get_kr_stock_info(ticker: str, cache_key: str = "") -> dict:
     """
     asset_name = KR_ASSETS.get(ticker, get_kr_stock_name(ticker))
     
-    # Fetch recent price to extract current close and change
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
-    
-    df = get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
-    
     current_price = 0.0
     daily_change = 0.0
     last_updated = "N/A"
-    
-    if not df.empty:
-        latest = df.iloc[-1]
-        current_price = float(latest['Close'])
-        # Handle different column names for change
-        if 'Change' in latest:
-            daily_change = float(latest['Change']) * 100 # Change is usually represented as a decimal fraction
-        elif len(df) > 1:
-            prev_close = float(df.iloc[-2]['Close'])
-            daily_change = ((current_price - prev_close) / prev_close) * 100
+
+    # 1. 시도: 네이버 파이낸스 폴링 API로 실시간 시세 가져오기 (사용자 요청 참고)
+    import requests
+    try:
+        # 글로벌 인덱스(^)가 아닌 경우에만 네이버 폴링 API 사용
+        if not ticker.startswith("^"):
+            url = f"https://polling.finance.naver.com/api/realtime/domestic/stock/{ticker}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            res = requests.get(url, headers=headers, timeout=3)
+            if res.status_code == 200:
+                data = res.json()
+                if "datas" in data and len(data["datas"]) > 0:
+                    item = data["datas"][0]
+                    current_price = float(item.get("closePriceRaw", 0))
+                    daily_change = float(item.get("fluctuationsRatioRaw", 0))
+                    last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        print(f"Failed to fetch real-time info from Naver for {ticker}: {e}")
+
+    # 2. 폴백: 네이버 API 실패 또는 글로벌 인덱스인 경우 과거 데이터 활용 (yfinance)
+    if current_price == 0.0:
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
         
-        if 'Date' in latest:
-            last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        df = get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
+        
+        if not df.empty:
+            latest = df.iloc[-1]
+            current_price = float(latest['Close'])
+            # Handle different column names for change
+            if 'Change' in latest:
+                daily_change = float(latest['Change']) * 100 # Change is usually represented as a decimal fraction
+            elif len(df) > 1:
+                prev_close = float(df.iloc[-2]['Close'])
+                daily_change = ((current_price - prev_close) / prev_close) * 100
             
+            if 'Date' in latest:
+                last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
     return {
         'ticker': ticker,
         'name': asset_name,
