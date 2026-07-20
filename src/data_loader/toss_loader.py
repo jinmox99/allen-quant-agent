@@ -69,6 +69,14 @@ def get_toss_stock_data(ticker: str, start_date: str = "", end_date: str = "", c
         return df
 
     def fallback_to_static_or_kr():
+        try:
+            from data_loader.kr_loader import get_kr_stock_data
+            df = get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
+            if not df.empty:
+                return df
+        except Exception as e:
+            print(f"kr_loader failed for {ticker}, trying static file: {e}")
+            
         import json
         static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}.csv')
         if os.path.exists(static_file):
@@ -85,8 +93,8 @@ def get_toss_stock_data(ticker: str, start_date: str = "", end_date: str = "", c
             except Exception as e:
                 print(f"Failed to load static data for {ticker}: {e}")
         
-        from data_loader.kr_loader import get_kr_stock_data
-        return get_kr_stock_data(ticker, start_date, end_date, cache_key=cache_key)
+        # If both fail, return empty dataframe to avoid crashing
+        return pd.DataFrame()
 
     token = get_toss_token()
     if not token:
@@ -148,6 +156,14 @@ def get_toss_stock_info(ticker: str, cache_key: str = "") -> dict:
         return get_kr_stock_info(ticker, cache_key=cache_key)
         
     def fallback_to_static_or_kr():
+        try:
+            from data_loader.kr_loader import get_kr_stock_info
+            info = get_kr_stock_info(ticker, cache_key=cache_key)
+            if info and info.get('current_price', 0.0) != 0.0:
+                return info
+        except Exception as e:
+            print(f"kr_loader info failed for {ticker}, trying static file: {e}")
+            
         import json
         static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}_info.json')
         if os.path.exists(static_file):
@@ -156,9 +172,15 @@ def get_toss_stock_info(ticker: str, cache_key: str = "") -> dict:
                     return json.load(f)
             except Exception as e:
                 print(f"Failed to load static info for {ticker}: {e}")
-                
-        from data_loader.kr_loader import get_kr_stock_info
-        return get_kr_stock_info(ticker, cache_key=cache_key)
+        
+        # Return basic info if all fail
+        return {
+            'ticker': ticker,
+            'name': asset_name,
+            'current_price': 0.0,
+            'change_percent': 0.0,
+            'last_updated': "N/A"
+        }
 
     token = get_toss_token()
     if not token:

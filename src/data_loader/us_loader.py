@@ -162,22 +162,6 @@ def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None,
         end_date = datetime.now().strftime('%Y-%m-%d')
         
     def fallback_to_yf():
-        import os
-        static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}.csv')
-        if os.path.exists(static_file):
-            try:
-                df = pd.read_csv(static_file)
-                df['Date'] = pd.to_datetime(df['Date'])
-                if start_date:
-                    start = pd.to_datetime(start_date)
-                    df = df[df['Date'] >= start]
-                if end_date:
-                    end = pd.to_datetime(end_date)
-                    df = df[df['Date'] <= end]
-                return df.reset_index(drop=True)
-            except Exception as e:
-                print(f"Failed to load static US data for {ticker}: {e}")
-                
         try:
             # yfinance can fetch directly
             df = yf.download(ticker, start=start_date, end=end_date, progress=False)
@@ -195,8 +179,25 @@ def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None,
                 df = df.dropna(subset=['Close'])
             return df
         except Exception as e:
-            print(f"Error fetching US data via yfinance for ticker {ticker}: {str(e)}")
-            return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
+            print(f"Error fetching US data via yfinance for ticker {ticker}, trying static file: {str(e)}")
+            
+        import os
+        static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}.csv')
+        if os.path.exists(static_file):
+            try:
+                df = pd.read_csv(static_file)
+                df['Date'] = pd.to_datetime(df['Date'])
+                if start_date:
+                    start = pd.to_datetime(start_date)
+                    df = df[df['Date'] >= start]
+                if end_date:
+                    end = pd.to_datetime(end_date)
+                    df = df[df['Date'] <= end]
+                return df.reset_index(drop=True)
+            except Exception as e:
+                print(f"Failed to load static US data for {ticker}: {e}")
+                
+        return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
 
     from data_loader.toss_loader import get_toss_token
     token = get_toss_token()
@@ -263,6 +264,28 @@ def get_us_stock_info(ticker: str, cache_key: str = "") -> dict:
                 pass
                 
         def fallback_to_yf():
+            try:
+                end_date = datetime.now().strftime('%Y-%m-%d')
+                start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+                df = get_us_stock_data(ticker, start_date, end_date, cache_key=cache_key)
+                
+                # Check if yfinance returned empty or default data
+                if df.empty or (len(df) > 0 and 'Close' not in df.columns) or (len(df) == 0):
+                    raise ValueError("No valid data from yfinance fallback.")
+                    
+                current_price = float(df.iloc[-1]['Close'])
+                prev_close = float(df.iloc[-2]['Close']) if len(df) > 1 else current_price
+                change_percent = ((current_price - prev_close) / prev_close) * 100
+                return {
+                    'ticker': ticker,
+                    'name': asset_name,
+                    'current_price': current_price,
+                    'change_percent': change_percent,
+                    'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            except Exception as e:
+                print(f"yfinance info fallback failed for {ticker}, trying static file: {e}")
+                
             import os
             import json
             static_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'toss', f'{ticker}_info.json')
@@ -273,22 +296,12 @@ def get_us_stock_info(ticker: str, cache_key: str = "") -> dict:
                 except Exception as e:
                     print(f"Failed to load static US info for {ticker}: {e}")
                     
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
-            df = get_us_stock_data(ticker, start_date, end_date, cache_key=cache_key)
-            if not df.empty:
-                current_price = float(df.iloc[-1]['Close'])
-                prev_close = float(df.iloc[-2]['Close']) if len(df) > 1 else current_price
-                change_percent = ((current_price - prev_close) / prev_close) * 100
-            else:
-                current_price = 0.0
-                change_percent = 0.0
             return {
                 'ticker': ticker,
                 'name': asset_name,
-                'current_price': current_price,
-                'change_percent': change_percent,
-                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'current_price': 0.0,
+                'change_percent': 0.0,
+                'last_updated': "N/A"
             }
             
         from data_loader.toss_loader import get_toss_token
