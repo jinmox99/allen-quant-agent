@@ -42,6 +42,7 @@ def simulate_custom_dca(df: pd.DataFrame,
     cash = initial_capital
     shares = 0.0
     total_invested_for_current_cycle = 0.0
+    cycle_start_price = float(df['Close'].iloc[0])
     
     trades = []
     history = []
@@ -55,6 +56,7 @@ def simulate_custom_dca(df: pd.DataFrame,
         if shares == 0:
             buy_amount = min(cash, initial_buy_amount)
             reason = "사이클 시작 최초 매수"
+            cycle_start_price = price  # Reset stock tracking price
         else:
             buy_amount = min(cash, daily_buy_amount)
             reason = "일일 분할 매수"
@@ -71,9 +73,11 @@ def simulate_custom_dca(df: pd.DataFrame,
             
         if current_date.weekday() == 4 and shares > 0:
             current_value = shares * price
-            current_return_pct = ((current_value - total_invested_for_current_cycle) / total_invested_for_current_cycle) * 100
             
-            if current_return_pct >= take_profit_pct:
+            # 주간 누적 주가 상승률 (해당 종목의 수익률 기준)
+            stock_return_pct = ((price - cycle_start_price) / cycle_start_price) * 100
+            
+            if stock_return_pct >= take_profit_pct:
                 # Take profit: sell ONLY the target profit amount
                 profit_target_amount = total_invested_for_current_cycle * (take_profit_pct / 100.0)
                 shares_to_sell = profit_target_amount / price
@@ -85,15 +89,17 @@ def simulate_custom_dca(df: pd.DataFrame,
                 cash += realized_cash
                 shares -= shares_to_sell
                 
+                # Reset cycle start price to current price for the next target
+                cycle_start_price = price
+                
                 # We do NOT reduce total_invested_for_current_cycle because we only withdrew profit, not principal.
-                # Next week, the remaining shares + newly bought shares will be evaluated against the accumulated principal.
                 
                 trades.append({
                     "Date": date_str, 
                     "Action": "SELL", 
                     "Price": price, 
                     "Shares": shares_to_sell, 
-                    "Reason": f"목표 수익 달성 ({take_profit_pct}% 익절, {realized_cash:,.0f}원 현금화)"
+                    "Reason": f"종목 목표 수익 달성 ({take_profit_pct}% 익절, {realized_cash:,.0f}원 현금화)"
                 })
                 
         history.append(cash + shares * price)
