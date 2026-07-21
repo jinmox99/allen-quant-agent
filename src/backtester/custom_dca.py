@@ -14,16 +14,15 @@ def calculate_mdd(history):
 
 def simulate_custom_dca(df: pd.DataFrame, 
                         initial_capital: float = 100000000.0, 
-                        initial_buy_amount: float = 10000000.0,
-                        daily_buy_amount: float = 100000.0,
+                        initial_buy_pct: float = 10.0,
+                        daily_buy_pct: float = 1.0,
                         take_profit_pct: float = 5.0) -> dict:
     """
-    Simulates a Dollar Cost Averaging (DCA) strategy with Friday profit taking.
+    Simulates a DCA strategy with compound asset tracking and Friday profit taking.
     - Start with initial_capital.
-    - At the start of a cycle (shares == 0), buy `initial_buy_amount` worth of stock.
-    - Every subsequent day, buy `daily_buy_amount` worth of stock.
-    - Every Friday, check if the return of the currently held shares is >= `take_profit_pct`.
-      If yes, sell all shares and realize the profit into cash, starting a new cycle.
+    - At cycle start (shares == 0), calc initial/daily buy amounts based on CURRENT total asset.
+    - Every Friday, check if the stock return since cycle start >= take_profit_pct.
+    - If yes, sell ALL shares. The cycle resets next day with new compounded total asset.
     """
     if df.empty or len(df) < 5:
         return {}
@@ -41,8 +40,10 @@ def simulate_custom_dca(df: pd.DataFrame,
 
     cash = initial_capital
     shares = 0.0
-    total_invested_for_current_cycle = 0.0
+    
     cycle_start_price = float(df['Close'].iloc[0])
+    cycle_initial_buy_amt = 0.0
+    cycle_daily_buy_amt = 0.0
     
     trades = []
     history = []
@@ -54,60 +55,51 @@ def simulate_custom_dca(df: pd.DataFrame,
         
         # 1. Daily Buy (or Initial Buy if starting a new cycle)
         if shares == 0:
-            buy_amount = min(cash, initial_buy_amount)
-            reason = "사이클 시작 최초 매수"
+            current_total_asset = cash  # shares are 0, so cash is total asset
+            cycle_initial_buy_amt = current_total_asset * (initial_buy_pct / 100.0)
+            cycle_daily_buy_amt = current_total_asset * (daily_buy_pct / 100.0)
+            
+            buy_amount = min(cash, cycle_initial_buy_amt)
+            reason = f"사이클 시작 최초 매수 (총자산의 {initial_buy_pct:g}%)"
             cycle_start_price = price  # Reset stock tracking price
         else:
-            buy_amount = min(cash, daily_buy_amount)
+            buy_amount = min(cash, cycle_daily_buy_amt)
             reason = "일일 분할 매수"
             
         if buy_amount > 0:
             bought_shares = buy_amount / price
             shares += bought_shares
             cash -= buy_amount
-            total_invested_for_current_cycle += buy_amount
             
             # Record trade only for the initial buy to avoid cluttering the trade log
-            if reason == "사이클 시작 최초 매수":
+            if "최초 매수" in reason:
                 trades.append({"Date": date_str, "Action": "BUY", "Price": price, "Shares": bought_shares, "Reason": reason})
             
         if current_date.weekday() == 4 and shares > 0:
-            current_value = shares * price
-            
             # 주간 누적 주가 상승률 (해당 종목의 수익률 기준)
             stock_return_pct = ((price - cycle_start_price) / cycle_start_price) * 100
             
             if stock_return_pct >= take_profit_pct:
-                # Take profit: sell ONLY the target profit amount
-                profit_target_amount = total_invested_for_current_cycle * (take_profit_pct / 100.0)
-                shares_to_sell = profit_target_amount / price
-                
-                # Safety check
-                shares_to_sell = min(shares_to_sell, shares)
-                realized_cash = shares_to_sell * price
-                
+                # Take profit: sell ALL shares
+                realized_cash = shares * price
                 cash += realized_cash
-                shares -= shares_to_sell
-                
-                # Reset cycle start price to current price for the next target
-                cycle_start_price = price
-                
-                # We do NOT reduce total_invested_for_current_cycle because we only withdrew profit, not principal.
                 
                 trades.append({
                     "Date": date_str, 
                     "Action": "SELL", 
                     "Price": price, 
-                    "Shares": shares_to_sell, 
-                    "Reason": f"종목 목표 수익 달성 ({take_profit_pct}% 익절, {realized_cash:,.0f}원 현금화)"
+                    "Shares": shares, 
+                    "Reason": f"종목 목표 수익 달성 ({take_profit_pct}% 익절, 전량 매도)"
                 })
+                
+                shares = 0.0
                 
         history.append(cash + shares * price)
         
     final_value = cash + (shares * float(df['Close'].iloc[-1]))
     total_return = ((final_value - initial_capital) / initial_capital) * 100
     
-    desc = f"최초 {initial_buy_amount:,.0f}원 매수 후 매일 {daily_buy_amount:,.0f}원씩 분할매수. 매주 금요일 보유 수익률이 {take_profit_pct}% 이상일 때 전량 매도."
+    desc = f"총 자산의 {initial_buy_pct:g}% 최초 매수 후 매일 {daily_buy_pct:g}% 분할매수. 주가 {take_profit_pct}% 상승 시 전량 매도 및 복리 재투자."
     
     return {
         "return": total_return,
@@ -121,9 +113,9 @@ def simulate_custom_dca(df: pd.DataFrame,
 
 def optimize_custom_dca(df: pd.DataFrame, 
                         initial_capital: float = 100000000.0,
-                        initial_buy_amounts: list = [5000000, 10000000],
-                        daily_buy_amounts: list = [50000, 100000, 200000],
-                        take_profit_pcts: list = [3.0, 5.0, 7.0, 10.0]) -> dict:
+                        initial_buy_pcts: list = [5.0, 10.0],
+                        daily_buy_pcts: list = [1.0, 5.0],
+                        take_profit_pcts: list = [5.0, 10.0]) -> dict:
     
     best_return = -99999.0
     best_params = {}
@@ -131,7 +123,7 @@ def optimize_custom_dca(df: pd.DataFrame,
     
     results = []
     
-    for ibuy, dbuy, tp in product(initial_buy_amounts, daily_buy_amounts, take_profit_pcts):
+    for ibuy, dbuy, tp in product(initial_buy_pcts, daily_buy_pcts, take_profit_pcts):
         res = simulate_custom_dca(df, initial_capital, ibuy, dbuy, tp)
         if not res:
             continue

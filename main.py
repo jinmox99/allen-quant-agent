@@ -746,8 +746,8 @@ with tab3:
         
         if st.button("🚀 최적화 실행", type="primary", use_container_width=True, key="run_optimize_btn"):
             try:
-                opt_initial_buys = [(float(x.strip()) / 100.0) * opt_initial_capital for x in opt_initial_buys_str.split(',') if x.strip()]
-                opt_daily_buys = [(float(x.strip()) / 100.0) * opt_initial_capital for x in opt_daily_buys_str.split(',') if x.strip()]
+                opt_initial_buys = [float(x.strip()) for x in opt_initial_buys_str.split(',') if x.strip()]
+                opt_daily_buys = [float(x.strip()) for x in opt_daily_buys_str.split(',') if x.strip()]
                 opt_take_profits = [float(x.strip()) for x in opt_take_profits_str.split(',') if x.strip()]
                 
                 total_combinations = len(opt_initial_buys) * len(opt_daily_buys) * len(opt_take_profits)
@@ -769,10 +769,10 @@ with tab3:
                         params = opt_res['best_params']
                         bh = opt_res['buy_and_hold']
                         
-                        initial_buy_pct = (params['initial_buy'] / opt_initial_capital) * 100
-                        daily_buy_pct = (params['daily_buy'] / opt_initial_capital) * 100
+                        initial_buy_pct = params['initial_buy']
+                        daily_buy_pct = params['daily_buy']
                         
-                        st.success(f"**🏆 최적의 조건 발견!**\n- 최초 매수: {initial_buy_pct:g}% ({params['initial_buy']:,.0f}원)\n- 매일 매수: {daily_buy_pct:g}% ({params['daily_buy']:,.0f}원)\n- 익절 목표 수익률: {params['take_profit']}%")
+                        st.success(f"**🏆 최적의 조건 발견!**\n- 최초 매수(초기 자산 대비): {initial_buy_pct:g}%\n- 매일 매수(초기 자산 대비): {daily_buy_pct:g}%\n- 익절 목표 수익률: {params['take_profit']}%")
                         
                         col_r1, col_r2, col_r3 = st.columns(3)
                         col_r1.metric("최적 전략 누적 수익률", f"{best['return']:+.2f}%")
