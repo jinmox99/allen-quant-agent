@@ -110,7 +110,7 @@ st.markdown("<h1 class='agent-title'>⚡ AI 기술적 추세 분석 대시보드
 st.markdown("<p style='color: #94a3b8; font-size: 16px; margin-top: -12px;'>다중 지표를 활용한 입체적 추세 진단 및 Top 50 종목 랭킹 시스템</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-tab1, tab2 = st.tabs(["📊 단일 종목 분석", "🏆 시가총액 Top 50 랭킹"])
+tab1, tab2, tab3 = st.tabs(["📊 단일 종목 분석", "🏆 시가총액 Top 50 랭킹", "🧪 분할매수 전략 최적화"])
 
 # ----------------- FAVORITES MANAGER -----------------
 FAVORITES_FILE = "favorites.json"
@@ -726,3 +726,81 @@ with tab2:
         
     with us_etf_tab:
         render_ranking_tab("US_ETF", "미국 ETF")
+
+with tab3:
+    st.markdown("### 🧪 커스텀 분할매수 & 주간 익절 최적화")
+    st.markdown("<p style='color:#94a3b8; font-size:14px;'>최적의 매일 분할 매수 금액과 주간(금요일) 익절 목표 수익률 조합을 찾아냅니다.</p>", unsafe_allow_html=True)
+    
+    if not ticker_input:
+        st.warning("👈 왼쪽 사이드바에서 분석할 종목 코드를 입력해주세요.")
+    else:
+        with st.expander("⚙️ 최적화 변수 설정", expanded=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                opt_initial_capital = st.number_input("초기 자본금", min_value=1000000, value=100000000, step=1000000)
+                opt_initial_buy = st.number_input("초기 최초 매수 금액", min_value=0, value=10000000, step=1000000)
+            
+            with col2:
+                opt_daily_buys_str = st.text_input("매일 분할 매수 금액 탐색 범위 (쉼표 구분)", "50000, 100000, 200000, 500000")
+                opt_take_profits_str = st.text_input("매주 금요일 익절 목표 수익률 탐색 범위 (%, 쉼표 구분)", "3, 5, 7, 10")
+        
+        if st.button("🚀 최적화 실행", type="primary", use_container_width=True, key="run_optimize_btn"):
+            try:
+                opt_daily_buys = [float(x.strip()) for x in opt_daily_buys_str.split(',') if x.strip()]
+                opt_take_profits = [float(x.strip()) for x in opt_take_profits_str.split(',') if x.strip()]
+                
+                with st.spinner(f"'{ticker_input}' 종목 {len(opt_daily_buys) * len(opt_take_profits)}개 조합 시뮬레이션 중..."):
+                    from src.backtester.custom_dca import optimize_custom_dca
+                    
+                    start_date = (datetime.now() - timedelta(days=days_to_fetch + 250)).strftime('%Y-%m-%d')
+                    if is_kr:
+                        df_opt = get_kr_stock_data(ticker_input, start_date=start_date, cache_key=get_krx_cache_key())
+                    else:
+                        df_opt = get_us_stock_data(ticker_input, start_date=start_date, cache_key=get_us_cache_key())
+                        
+                    opt_res = optimize_custom_dca(df_opt, opt_initial_capital, opt_initial_buy, opt_daily_buys, opt_take_profits)
+                    
+                    if not opt_res or not opt_res.get('best_result'):
+                        st.error("백테스트에 실패했습니다. 데이터가 부족하거나 조건에 맞는 결과가 없습니다.")
+                    else:
+                        best = opt_res['best_result']
+                        params = opt_res['best_params']
+                        bh = opt_res['buy_and_hold']
+                        
+                        st.success(f"**🏆 최적의 조건 발견!**\n- 매일 분할 매수: {params['daily_buy']:,.0f}\n- 익절 목표 수익률: {params['take_profit']}%")
+                        
+                        col_r1, col_r2, col_r3 = st.columns(3)
+                        col_r1.metric("최적 전략 누적 수익률", f"{best['return']:+.2f}%")
+                        col_r2.metric("최적 전략 MDD", f"{best['mdd']:.1f}%")
+                        col_r3.metric("단순 보유(B&H) 수익률", f"{bh['return']:+.2f}%")
+                        
+                        fig_opt = go.Figure()
+                        fig_opt.add_trace(go.Scatter(
+                            x=df_opt['Date'], y=best['history'],
+                            mode='lines', name=f'최적화 전략 ({params["take_profit"]}% 익절)',
+                            line=dict(color='#38bdf8', width=2)
+                        ))
+                        fig_opt.add_trace(go.Scatter(
+                            x=df_opt['Date'], y=bh['history'],
+                            mode='lines', name='단순 보유 (Buy & Hold)',
+                            line=dict(color='#f59e0b', width=1, dash='dash')
+                        ))
+                        fig_opt.update_layout(
+                            title="최적화 전략 vs 단순 보유 자산 흐름",
+                            template="plotly_dark",
+                            paper_bgcolor='#0d0f14', plot_bgcolor='#0d0f14',
+                            yaxis_title="보유 자산", xaxis_title="날짜",
+                            margin=dict(t=50, b=40, l=40, r=40), height=400,
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        )
+                        st.plotly_chart(fig_opt, use_container_width=True)
+                        
+                        with st.expander("🔍 최적화 전략 상세 매매 내역"):
+                            trades_df = pd.DataFrame(best['trades'])
+                            if not trades_df.empty:
+                                trades_df = trades_df[['Date', 'Action', 'Price', 'Shares', 'Reason']]
+                                st.dataframe(trades_df, use_container_width=True)
+                            else:
+                                st.write("매매 내역이 없습니다.")
+            except Exception as e:
+                st.error(f"최적화 중 오류가 발생했습니다: {str(e)}")
