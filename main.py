@@ -738,16 +738,16 @@ with tab3:
             col1, col2 = st.columns(2)
             with col1:
                 opt_initial_capital = st.number_input("초기 자본금", min_value=1000000, value=100000000, step=1000000)
-                opt_initial_buys_str = st.text_input("초기 최초 매수 금액 탐색 범위 (쉼표 구분)", "5000000, 10000000, 20000000")
+                opt_initial_buys_str = st.text_input("초기 최초 매수 비율 (총자본 대비 %, 0~50)", "5, 10, 15, 20, 25, 30")
             
             with col2:
-                opt_daily_buys_str = st.text_input("매일 분할 매수 금액 탐색 범위 (쉼표 구분)", "50000, 100000, 200000, 500000")
-                opt_take_profits_str = st.text_input("매주 금요일 익절 목표 수익률 탐색 범위 (%, 쉼표 구분)", "3, 5, 7, 10")
+                opt_daily_buys_str = st.text_input("매일 분할 매수 비율 (총자본 대비 %, 0~50)", "1, 5, 10, 15, 20")
+                opt_take_profits_str = st.text_input("매주 금요일 익절 목표 수익률 (%, 0~50)", "5, 10, 15, 20, 25, 30")
         
         if st.button("🚀 최적화 실행", type="primary", use_container_width=True, key="run_optimize_btn"):
             try:
-                opt_initial_buys = [float(x.strip()) for x in opt_initial_buys_str.split(',') if x.strip()]
-                opt_daily_buys = [float(x.strip()) for x in opt_daily_buys_str.split(',') if x.strip()]
+                opt_initial_buys = [(float(x.strip()) / 100.0) * opt_initial_capital for x in opt_initial_buys_str.split(',') if x.strip()]
+                opt_daily_buys = [(float(x.strip()) / 100.0) * opt_initial_capital for x in opt_daily_buys_str.split(',') if x.strip()]
                 opt_take_profits = [float(x.strip()) for x in opt_take_profits_str.split(',') if x.strip()]
                 
                 total_combinations = len(opt_initial_buys) * len(opt_daily_buys) * len(opt_take_profits)
@@ -769,7 +769,10 @@ with tab3:
                         params = opt_res['best_params']
                         bh = opt_res['buy_and_hold']
                         
-                        st.success(f"**🏆 최적의 조건 발견!**\n- 최초 매수: {params['initial_buy']:,.0f}원\n- 매일 매수: {params['daily_buy']:,.0f}원\n- 익절 목표 수익률: {params['take_profit']}%")
+                        initial_buy_pct = (params['initial_buy'] / opt_initial_capital) * 100
+                        daily_buy_pct = (params['daily_buy'] / opt_initial_capital) * 100
+                        
+                        st.success(f"**🏆 최적의 조건 발견!**\n- 최초 매수: {initial_buy_pct:g}% ({params['initial_buy']:,.0f}원)\n- 매일 매수: {daily_buy_pct:g}% ({params['daily_buy']:,.0f}원)\n- 익절 목표 수익률: {params['take_profit']}%")
                         
                         col_r1, col_r2, col_r3 = st.columns(3)
                         col_r1.metric("최적 전략 누적 수익률", f"{best['return']:+.2f}%")
