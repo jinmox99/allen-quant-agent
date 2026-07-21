@@ -96,51 +96,10 @@ def get_toss_stock_data(ticker: str, start_date: str = "", end_date: str = "", c
         # If both fail, return empty dataframe to avoid crashing
         return pd.DataFrame()
 
-    token = get_toss_token()
-    if not token:
-        print(f"Toss token not available, falling back to static/kr_loader for {ticker}")
-        return fallback_to_static_or_kr()
-    
-    symbol = ticker
-    url = f"https://openapi.tossinvest.com/api/v1/candles?symbol={symbol}&interval=1d&count=200"
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    try:
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code != 200:
-            print(f"Failed to fetch Toss candles for {symbol}: {res.status_code} - {res.text}")
-            return fallback_to_static_or_kr()
-            
-        data = res.json()
-    except Exception as e:
-        print(f"Exception fetching Toss candles for {symbol}: {e}")
-        return fallback_to_static_or_kr()
-        
-    candles = data.get("result", {}).get("candles", [])
-    if not candles:
-        return fallback_to_static_or_kr()
-        
-    df = pd.DataFrame(candles)
-    
-    # Toss API returns: timestamp, openPrice, highPrice, lowPrice, closePrice, volume
-    df['Date'] = pd.to_datetime(df['timestamp']).dt.tz_localize(None)
-    df['Open'] = pd.to_numeric(df['openPrice'])
-    df['High'] = pd.to_numeric(df['highPrice'])
-    df['Low'] = pd.to_numeric(df['lowPrice'])
-    df['Close'] = pd.to_numeric(df['closePrice'])
-    df['Volume'] = pd.to_numeric(df['volume'])
-    
-    df = df.sort_values('Date').reset_index(drop=True)
-    df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
-    
-    if start_date:
-        start = pd.to_datetime(start_date)
-        df = df[df['Date'] >= start]
-    if end_date:
-        end = pd.to_datetime(end_date)
-        df = df[df['Date'] <= end]
-        
-    return df.reset_index(drop=True)
+    # Toss API candles have missing dates and incorrect adjustment factors.
+    # Therefore, we bypass Toss candles and ALWAYS use kr_loader (yfinance/Naver) for reliable historical data (SMA, MACD).
+    # This also fixes the change_percent calculation because kr_loader provides the correct previous close.
+    return fallback_to_static_or_kr().reset_index(drop=True)
 
 @st.cache_data(ttl=3600)
 def get_toss_stock_info(ticker: str, cache_key: str = "") -> dict:

@@ -199,43 +199,10 @@ def get_us_stock_data(ticker: str, start_date: str = None, end_date: str = None,
                 
         return pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
 
-    from data_loader.toss_loader import get_toss_token
-    token = get_toss_token()
-    if not token:
-        return fallback_to_yf()
-        
-    try:
-        import requests
-        url = f"https://openapi.tossinvest.com/api/v1/candles?symbol={ticker}&interval=1d&count=200"
-        res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            candles = data.get("result", {}).get("candles", [])
-            if candles:
-                df = pd.DataFrame(candles)
-                df['Date'] = pd.to_datetime(df['timestamp']).dt.tz_localize(None)
-                df['Open'] = pd.to_numeric(df['openPrice'])
-                df['High'] = pd.to_numeric(df['highPrice'])
-                df['Low'] = pd.to_numeric(df['lowPrice'])
-                df['Close'] = pd.to_numeric(df['closePrice'])
-                df['Volume'] = pd.to_numeric(df['volume'])
-                df = df.sort_values('Date').reset_index(drop=True)
-                df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
-                if start_date:
-                    start = pd.to_datetime(start_date)
-                    df = df[df['Date'] >= start]
-                if end_date:
-                    end = pd.to_datetime(end_date)
-                    df = df[df['Date'] <= end]
-                return df.reset_index(drop=True)
-            else:
-                return fallback_to_yf()
-        else:
-            print(f"Toss US data returned {res.status_code}. Falling back to yfinance.")
-            return fallback_to_yf()
-    except Exception as e:
-        print(f"Failed Toss API for US {ticker}: {e}")
-        return fallback_to_yf()
+    # Toss API candles can be unreliable (missing dates or incorrect adjustment).
+    # We bypass Toss candles and ALWAYS use yfinance for reliable historical data (SMA, MACD).
+    # This also fixes the change_percent calculation because yfinance provides the correct previous close.
+    return fallback_to_yf()
 
 @st.cache_data(ttl=3600)
 def get_us_stock_info(ticker: str, cache_key: str = "") -> dict:
