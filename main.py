@@ -738,7 +738,7 @@ with tab3:
             col1, col2 = st.columns(2)
             with col1:
                 opt_initial_capital = st.number_input("초기 자본금", min_value=1000000, value=100000000, step=1000000)
-                opt_initial_buy = st.number_input("초기 최초 매수 금액", min_value=0, value=10000000, step=1000000)
+                opt_initial_buys_str = st.text_input("초기 최초 매수 금액 탐색 범위 (쉼표 구분)", "5000000, 10000000, 20000000")
             
             with col2:
                 opt_daily_buys_str = st.text_input("매일 분할 매수 금액 탐색 범위 (쉼표 구분)", "50000, 100000, 200000, 500000")
@@ -746,10 +746,12 @@ with tab3:
         
         if st.button("🚀 최적화 실행", type="primary", use_container_width=True, key="run_optimize_btn"):
             try:
+                opt_initial_buys = [float(x.strip()) for x in opt_initial_buys_str.split(',') if x.strip()]
                 opt_daily_buys = [float(x.strip()) for x in opt_daily_buys_str.split(',') if x.strip()]
                 opt_take_profits = [float(x.strip()) for x in opt_take_profits_str.split(',') if x.strip()]
                 
-                with st.spinner(f"'{ticker_input}' 종목 {len(opt_daily_buys) * len(opt_take_profits)}개 조합 시뮬레이션 중..."):
+                total_combinations = len(opt_initial_buys) * len(opt_daily_buys) * len(opt_take_profits)
+                with st.spinner(f"'{ticker_input}' 종목 {total_combinations}개 조합 시뮬레이션 중..."):
                     from src.backtester.custom_dca import optimize_custom_dca
                     
                     start_date = (datetime.now() - timedelta(days=days_to_fetch + 250)).strftime('%Y-%m-%d')
@@ -758,7 +760,7 @@ with tab3:
                     else:
                         df_opt = get_us_stock_data(ticker_input, start_date=start_date, cache_key=get_us_cache_key())
                         
-                    opt_res = optimize_custom_dca(df_opt, opt_initial_capital, opt_initial_buy, opt_daily_buys, opt_take_profits)
+                    opt_res = optimize_custom_dca(df_opt, opt_initial_capital, opt_initial_buys, opt_daily_buys, opt_take_profits)
                     
                     if not opt_res or not opt_res.get('best_result'):
                         st.error("백테스트에 실패했습니다. 데이터가 부족하거나 조건에 맞는 결과가 없습니다.")
@@ -767,12 +769,18 @@ with tab3:
                         params = opt_res['best_params']
                         bh = opt_res['buy_and_hold']
                         
-                        st.success(f"**🏆 최적의 조건 발견!**\n- 매일 분할 매수: {params['daily_buy']:,.0f}\n- 익절 목표 수익률: {params['take_profit']}%")
+                        st.success(f"**🏆 최적의 조건 발견!**\n- 최초 매수: {params['initial_buy']:,.0f}원\n- 매일 매수: {params['daily_buy']:,.0f}원\n- 익절 목표 수익률: {params['take_profit']}%")
                         
                         col_r1, col_r2, col_r3 = st.columns(3)
                         col_r1.metric("최적 전략 누적 수익률", f"{best['return']:+.2f}%")
                         col_r2.metric("최적 전략 MDD", f"{best['mdd']:.1f}%")
                         col_r3.metric("단순 보유(B&H) 수익률", f"{bh['return']:+.2f}%")
+                        
+                        # Add Final Asset Breakdown
+                        final_cash = best['final_cash']
+                        final_stock_value = best['final_stock_value']
+                        final_total = final_cash + final_stock_value
+                        st.caption(f"💡 **최종 자산 구성 (최적 전략)**: 총 자산 {final_total:,.0f}원 = 💵 남은 현금 {final_cash:,.0f}원 + 📈 주식 평가금 {final_stock_value:,.0f}원")
                         
                         fig_opt = go.Figure()
                         fig_opt.add_trace(go.Scatter(

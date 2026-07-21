@@ -100,12 +100,14 @@ def simulate_custom_dca(df: pd.DataFrame,
         "mdd": calculate_mdd(history),
         "trades": trades,
         "desc": desc,
-        "history": history
+        "history": history,
+        "final_cash": cash,
+        "final_stock_value": shares * float(df['Close'].iloc[-1])
     }
 
 def optimize_custom_dca(df: pd.DataFrame, 
                         initial_capital: float = 100000000.0,
-                        initial_buy_amount: float = 10000000.0,
+                        initial_buy_amounts: list = [5000000, 10000000],
                         daily_buy_amounts: list = [50000, 100000, 200000],
                         take_profit_pcts: list = [3.0, 5.0, 7.0, 10.0]) -> dict:
     
@@ -115,12 +117,13 @@ def optimize_custom_dca(df: pd.DataFrame,
     
     results = []
     
-    for dbuy, tp in product(daily_buy_amounts, take_profit_pcts):
-        res = simulate_custom_dca(df, initial_capital, initial_buy_amount, dbuy, tp)
+    for ibuy, dbuy, tp in product(initial_buy_amounts, daily_buy_amounts, take_profit_pcts):
+        res = simulate_custom_dca(df, initial_capital, ibuy, dbuy, tp)
         if not res:
             continue
             
         results.append({
+            "initial_buy": ibuy,
             "daily_buy": dbuy,
             "take_profit": tp,
             "return": res["return"],
@@ -129,7 +132,7 @@ def optimize_custom_dca(df: pd.DataFrame,
         
         if res["return"] > best_return:
             best_return = res["return"]
-            best_params = {"initial_buy": initial_buy_amount, "daily_buy": dbuy, "take_profit": tp}
+            best_params = {"initial_buy": ibuy, "daily_buy": dbuy, "take_profit": tp}
             best_result = res
             
     # Calculate Buy & Hold for comparison
