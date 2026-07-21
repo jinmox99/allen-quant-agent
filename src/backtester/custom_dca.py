@@ -69,24 +69,32 @@ def simulate_custom_dca(df: pd.DataFrame,
             if reason == "사이클 시작 최초 매수":
                 trades.append({"Date": date_str, "Action": "BUY", "Price": price, "Shares": bought_shares, "Reason": reason})
             
-        # 2. Friday Profit Taking Check
-        # current_date.weekday(): Monday=0, ..., Friday=4
         if current_date.weekday() == 4 and shares > 0:
             current_value = shares * price
             current_return_pct = ((current_value - total_invested_for_current_cycle) / total_invested_for_current_cycle) * 100
             
             if current_return_pct >= take_profit_pct:
-                # Take profit: sell all shares
-                cash += current_value
+                # Take profit: sell ONLY the target profit amount
+                profit_target_amount = total_invested_for_current_cycle * (take_profit_pct / 100.0)
+                shares_to_sell = profit_target_amount / price
+                
+                # Safety check
+                shares_to_sell = min(shares_to_sell, shares)
+                realized_cash = shares_to_sell * price
+                
+                cash += realized_cash
+                shares -= shares_to_sell
+                
+                # We do NOT reduce total_invested_for_current_cycle because we only withdrew profit, not principal.
+                # Next week, the remaining shares + newly bought shares will be evaluated against the accumulated principal.
+                
                 trades.append({
                     "Date": date_str, 
                     "Action": "SELL", 
                     "Price": price, 
-                    "Shares": shares, 
-                    "Reason": f"금요일 익절 조건 달성 (+{current_return_pct:.2f}%)"
+                    "Shares": shares_to_sell, 
+                    "Reason": f"목표 수익 달성 ({take_profit_pct}% 익절, {realized_cash:,.0f}원 현금화)"
                 })
-                shares = 0.0
-                total_invested_for_current_cycle = 0.0
                 
         history.append(cash + shares * price)
         
